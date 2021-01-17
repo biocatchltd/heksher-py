@@ -9,5 +9,5 @@ if [ "$res" -ne "0" ]
   then
     echo "pytype not run, please run in python 3.8 or lower"
   else
-    poetry run pytype --keep-going <$package$>
+    poetry run pytype --keep-going heksher
 fi

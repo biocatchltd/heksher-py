@@ -1,17 +1,17 @@
 [tool.poetry]
-name = <$package!quote$>
-version = <$inital_version!quote$>
-description = <$description!quote$>
-authors = <$authors!quote_each$>
-license = <$license!short!quote$>
+name = "heksher"
+version = "0.1.0.dev"
+description = ""
+authors = ["Biocatch LTD"]
+license = "MIT"
 readme = "README.md"
-repository = <$repo_link!quote$>
+repository = "https://github.com/biocatchltd/heksher-py"
 packages = [
-    {include=<$package!quote$>}
+    {include="heksher"}
 ]
 
 [tool.poetry.dependencies]
-python = <$py_versions!semver!quote$>
+python = "^3.7"
 
 [tool.poetry.dev-dependencies]
 pydantic = "*"

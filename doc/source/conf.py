@@ -17,9 +17,9 @@ sys.path.insert(0, os.path.abspath('../..'))
 
 # -- Project information -----------------------------------------------------
 
-project = '<$package$>'
-copyright = '<$year$>, <$authors$>'
-author = '<$authors$>'
+project = 'heksher'
+copyright = '2021, ben avrahami <ben.avrahami@biocatch.com>'
+author = 'ben avrahami <ben.avrahami@biocatch.com>'
 
 
 # -- General configuration ---------------------------------------------------
