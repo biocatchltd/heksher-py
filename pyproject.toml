@@ -2,7 +2,7 @@
 name = "heksher"
 version = "0.1.0.dev"
 description = ""
-authors = ["Biocatch LTD"]
+authors = ["Biocatch LTD <serverteam@biocatch.com>"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/biocatchltd/heksher-py"
@@ -12,14 +12,17 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.7"
+orjson = "^3.4.6"
+httpx = "^0.16.1"
+mock = {version="^4.0.3", markers = "python_version < '3.8'"}
 
 [tool.poetry.dev-dependencies]
-pydantic = "*"
 pytest = "*"
+pytest-asyncio = "*"
 flake8 = { version = "*", allow-prereleases = true }
 pytest-cov = "*"
-sphinx = "*"
 pytype = { version = ">=2020.06.01", markers = "python_version < '3.9' and python_version >= '3.6' and platform_system != 'Windows'"}
+yellowbox = {version="^0.4.1", extras=["http"]}
 
 [build-system]
 requires = ["poetry>=0.12"]
