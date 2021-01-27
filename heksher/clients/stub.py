@@ -119,7 +119,7 @@ class AsyncStubHeksherClient(StubClient, AsyncContextManagerMixin):
 
 class SyncStubHeksherClient(StubClient, ContextManagerMixin):
     """
-    A synchronous heksher client. Compatible with SyncHeksherClient.
+    A synchronous heksher client. Compatible with ThreadHeksherClient.
     """
     close = None
 

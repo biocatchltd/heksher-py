@@ -5,14 +5,14 @@ from time import sleep
 from httpx import HTTPError
 from pytest import mark, raises
 
-from heksher.clients.sync_client import SyncHeksherClient
+from heksher.clients.thread_client import ThreadHeksherClient
 from heksher.setting import Setting
 from tests.unittest.util import assert_logs
 
 
 def test_init_works(fake_heksher_service, monkeypatch):
     monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b', 'c'])
-    with SyncHeksherClient(fake_heksher_service.url, 100000, ['a', 'b', 'c']):
+    with ThreadHeksherClient(fake_heksher_service.url, 100000, ['a', 'b', 'c']):
         pass
 
 
@@ -31,7 +31,7 @@ def test_declare_before_main(fake_heksher_service, monkeypatch):
         }
     }
 
-    with SyncHeksherClient(fake_heksher_service.url, 100000, ['a', 'b', 'c']):
+    with ThreadHeksherClient(fake_heksher_service.url, 100000, ['a', 'b', 'c']):
         assert setting.get(a='', b='', c='') == 100
 
 
@@ -41,7 +41,7 @@ def test_declare_after_main(fake_heksher_service, monkeypatch):
         'created': True, 'changed': [], 'incomplete': {}
     })
 
-    with SyncHeksherClient(fake_heksher_service.url, 100000, ['a', 'b', 'c']) as client:
+    with ThreadHeksherClient(fake_heksher_service.url, 100000, ['a', 'b', 'c']) as client:
         setting = Setting('cache_size', int, ['b', 'c'], 50)
         assert not client._undeclared.empty()
         client._undeclared.join()
@@ -66,7 +66,7 @@ def test_regular_update(fake_heksher_service, monkeypatch):
 
     setting = Setting('cache_size', int, ['b', 'c'], 50)
 
-    with SyncHeksherClient(fake_heksher_service.url, 0.02, ['a', 'b', 'c']):
+    with ThreadHeksherClient(fake_heksher_service.url, 0.02, ['a', 'b', 'c']):
         assert setting.get(a='', b='', c='') == 50
         fake_heksher_service.query_response = {
             'rules': {
@@ -83,7 +83,7 @@ def test_heksher_unreachable(caplog):
     setting = Setting('cache_size', int, ['b', 'c'], 50)
 
     with assert_logs(caplog, ERROR):
-        with SyncHeksherClient('http://notreal.fake.notreal', 10000, ['a', 'b', 'c']):
+        with ThreadHeksherClient('http://notreal.fake.notreal', 10000, ['a', 'b', 'c']):
             assert setting.get(a='', b='', c='') == 50
 
 
@@ -104,7 +104,7 @@ def test_trackcontexts(fake_heksher_service, monkeypatch):
         }
     }
 
-    client = SyncHeksherClient(fake_heksher_service.url, 100000, ['a', 'b', 'c'])
+    client = ThreadHeksherClient(fake_heksher_service.url, 100000, ['a', 'b', 'c'])
     client.track_contexts(b='B', a=['a0', 'a1'])
 
     with client:
@@ -132,7 +132,7 @@ def test_cf_mismatch(fake_heksher_service, caplog, monkeypatch, expected):
     monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b', 'c'])
 
     with assert_logs(caplog, WARNING):
-        with SyncHeksherClient(fake_heksher_service.url, 1000, expected) as client:
+        with ThreadHeksherClient(fake_heksher_service.url, 1000, expected) as client:
             assert client._context_features == ['a', 'b', 'c']
 
 
@@ -152,25 +152,25 @@ def test_redundant_defaults(fake_heksher_service, caplog, monkeypatch):
     }
 
     with assert_logs(caplog, WARNING):
-        with SyncHeksherClient(fake_heksher_service.url, 1000, ['a', 'b', 'c']) as client:
+        with ThreadHeksherClient(fake_heksher_service.url, 1000, ['a', 'b', 'c']) as client:
             client.set_defaults(b='B', d='im redundant')
             assert setting.get(a='', c='') == 100
 
 
 def test_health_OK(fake_heksher_service):
-    client = SyncHeksherClient(fake_heksher_service.url, 1000, ['a', 'b', 'c'])
+    client = ThreadHeksherClient(fake_heksher_service.url, 1000, ['a', 'b', 'c'])
     client.ping()
 
 
 def test_health_err(fake_heksher_service, monkeypatch):
     monkeypatch.setattr(fake_heksher_service, 'health_response', 403)
 
-    client = SyncHeksherClient(fake_heksher_service.url, 1000, ['a', 'b', 'c'])
+    client = ThreadHeksherClient(fake_heksher_service.url, 1000, ['a', 'b', 'c'])
     with raises(HTTPError):
         client.ping()
 
 
 def test_health_unreachable():
-    client = SyncHeksherClient('http://notreal.fake.notreal', 1000, ['a', 'b', 'c'])
+    client = ThreadHeksherClient('http://notreal.fake.notreal', 1000, ['a', 'b', 'c'])
     with raises(HTTPError):
         client.ping()

@@ -19,7 +19,7 @@ logger = getLogger(__name__)
 T = TypeVar('T')
 
 
-class SyncHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin):
+class ThreadHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin):
     """
     A synchronous heksher client, using heksher's V1 HTTP API
     """
