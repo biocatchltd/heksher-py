@@ -6,10 +6,10 @@ from typing import TypeVar, Mapping, Optional, Generic, Union, Collection, Conte
 from unittest.mock import MagicMock
 
 try:
-    from unittest.mock import AsyncMock
+    from unittest.mock import AsyncMock  # pytype: disable=import-error
 except ImportError:
     # asyncmock only available for python 3.8 and up, for earlier versions, we use the backport
-    from mock import AsyncMock
+    from mock import AsyncMock  # pytype: disable=import-error
 
 from heksher.clients.subclasses import ContextFeaturesMixin, AsyncContextManagerMixin, ContextManagerMixin
 from heksher.clients.util import collate_rules
