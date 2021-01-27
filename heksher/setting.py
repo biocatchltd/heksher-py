@@ -126,7 +126,7 @@ Will be collated to the following rulebranch:
 """
 
 
-class RuleSet(NamedTuple, Generic[T]):
+class RuleSet(NamedTuple):
     """
     A complete set of rules, resolvable through a namespace
     """
