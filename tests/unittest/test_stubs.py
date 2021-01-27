@@ -1,5 +1,5 @@
 from contextvars import ContextVar
-from typing import Dict
+from typing import Mapping
 
 from pytest import mark, raises
 
@@ -13,29 +13,27 @@ def test_sync_stub():
     a = Setting('a', int, [])
 
     with SyncStubHeksherClient() as client:
-        b = Setting('b', Dict[str, int], [])
-        client[a] = 10
-        client[b] = {
+        b = Setting('b', Mapping[str, int], [])
+        with client.patch(a, 10), client.patch(b, {
             't': 1,
             'z': 2
-        }
-        c = Setting('c', int, [])
+        }):
+            c = Setting('c', int, [])
+            client.patch(c, [
+                Rule({'user': None, 'theme': None}, 0),
+                Rule({'user': None, 'theme': 'dark'}, 1),
+                Rule({'user': 'admin', 'theme': None}, 2)
+            ])
 
-        client[c] = [
-            Rule({'user': None, 'theme': None}, 0),
-            Rule({'user': None, 'theme': 'dark'}, 1),
-            Rule({'user': 'admin', 'theme': None}, 2)
-        ]
-
-        assert a.get() == 10
-        assert b.get() == {
-            't': 1,
-            'z': 2
-        }
-        assert c.get(user='', theme='') == 0
-        assert c.get(user='', theme='dark') == 1
-        assert c.get(user='admin', theme='') == 2
-        assert c.get(user='admin', theme='dark') == 1
+            assert a.get() == 10
+            assert b.get() == {
+                't': 1,
+                'z': 2
+            }
+            assert c.get(user='', theme='') == 0
+            assert c.get(user='', theme='dark') == 1
+            assert c.get(user='admin', theme='') == 2
+            assert c.get(user='admin', theme='dark') == 1
 
 
 @atest
@@ -43,39 +41,37 @@ async def test_async_stub():
     a = Setting('a', int, [])
 
     async with AsyncStubHeksherClient() as client:
-        b = Setting('b', Dict[str, int], [])
-        client[a] = 10
-        client[b] = {
+        b = Setting('b', Mapping[str, int], [])
+        with client.patch(a, 10), client.patch(b, {
             't': 1,
             'z': 2
-        }
-        c = Setting('c', int, [])
+        }):
+            c = Setting('c', int, [])
+            client.patch(c, [
+                Rule({'user': None, 'theme': None}, 0),
+                Rule({'user': None, 'theme': 'dark'}, 1),
+                Rule({'user': 'admin', 'theme': None}, 2)
+            ])
 
-        client[c] = [
-            Rule({'user': None, 'theme': None}, 0),
-            Rule({'user': None, 'theme': 'dark'}, 1),
-            Rule({'user': 'admin', 'theme': None}, 2)
-        ]
-
-        assert a.get() == 10
-        assert b.get() == {
-            't': 1,
-            'z': 2
-        }
-        assert c.get(user='', theme='') == 0
-        assert c.get(user='', theme='dark') == 1
-        assert c.get(user='admin', theme='') == 2
-        assert c.get(user='admin', theme='dark') == 1
+            assert a.get() == 10
+            assert b.get() == {
+                't': 1,
+                'z': 2
+            }
+            assert c.get(user='', theme='') == 0
+            assert c.get(user='', theme='dark') == 1
+            assert c.get(user='admin', theme='') == 2
+            assert c.get(user='admin', theme='dark') == 1
 
 
 def test_stub_bad_patch():
     with SyncStubHeksherClient() as client:
-        b = Setting('b', Dict[str, int], [])
+        b = Setting('b', Mapping[str, int], [])
         with raises(RuntimeError):
-            client[b] = [
+            client.patch(b, [
                 Rule({'user': None}, 0),
                 Rule({'user': None, 'theme': 'dark'}, 1)
-            ]
+            ])
 
 
 def test_repeat_default():
@@ -96,4 +92,4 @@ def test_default_context_var():
         client.set_defaults(a=a, b=b, c=c, d=d)
         c.set('cookie')
         d.set('delta')
-        assert client.default_context_namespace() == {'b': 'beta', 'c': 'cookie', 'd': 'delta'}
+        assert client.context_namespace({}) == {'b': 'beta', 'c': 'cookie', 'd': 'delta'}

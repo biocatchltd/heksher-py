@@ -3,7 +3,8 @@ from copy import deepcopy
 from enum import IntFlag, auto
 from logging import ERROR, WARNING
 
-from pytest import mark
+from httpx import HTTPError
+from pytest import mark, raises
 
 from heksher.clients.async_client import AsyncHeksherClient
 from heksher.setting import Setting
@@ -214,3 +215,28 @@ async def test_flags_setting(fake_heksher_service, monkeypatch):
     }
     async with AsyncHeksherClient(fake_heksher_service.url, 1000, ['a', 'b', 'c']):
         assert c.get(a='', b='', c='') == Color.green | Color.blue
+
+
+@atest
+async def test_health_OK(fake_heksher_service):
+    client = AsyncHeksherClient(fake_heksher_service.url, 1000, ['a', 'b', 'c'])
+    await client.ping()
+    await client.close()
+
+
+@atest
+async def test_health_err(fake_heksher_service, monkeypatch):
+    monkeypatch.setattr(fake_heksher_service, 'health_response', 403)
+
+    client = AsyncHeksherClient(fake_heksher_service.url, 1000, ['a', 'b', 'c'])
+    with raises(HTTPError):
+        await client.ping()
+    await client.close()
+
+
+@atest
+async def test_health_unreachable():
+    client = AsyncHeksherClient('http://notreal.fake.notreal', 1000, ['a', 'b', 'c'])
+    with raises(HTTPError):
+        await client.ping()
+    await client.close()

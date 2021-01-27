@@ -9,6 +9,7 @@ from typing import Optional, Dict, Sequence, Any, TypeVar, Union
 
 import orjson
 from httpx import Client, HTTPError
+from ordered_set import OrderedSet
 
 from heksher.clients.subclasses import V1APIClient, ContextFeaturesMixin, ContextManagerMixin
 from heksher.setting import Setting, MISSING
@@ -19,14 +20,23 @@ T = TypeVar('T')
 
 
 class SyncHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin):
+    """
+    A synchronous heksher client, using heksher's V1 HTTP API
+    """
     declaration_loop_interval = 1
+    """
+    The timeout when waiting for new settings to declare. This is the maximum blocking time of the declare
+     thread closing.
+    """
 
     def __init__(self, service_url: str, update_interval: float, context_features: Sequence[str], *,
                  http_client_args: Dict[str, Any] = None):
         """
         Args:
             service_url: The HTTP url to the Heksher server.
-            update_interval: the interval, in seconds to wait between any two regular update calls.
+            update_interval: The interval to wait between any two regular update calls, in seconds.
+            context_features: The context features to expect in the Heksher server.
+            http_client_args: Forwarded as kwargs to httpx.AsyncClient constructor.
         """
         super().__init__(context_features)
 
@@ -41,6 +51,10 @@ class SyncHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin):
         self._last_cache_time: Optional[datetime] = None
 
         self.modification_lock = Lock()
+        """
+        A lock that is acquired whenever setting values are updated. To ensure that no modifications are made to
+        settings, acquire this lock.
+        """
 
         self._update_event = Event()
         """This event marks that an update occurred"""
@@ -50,9 +64,17 @@ class SyncHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin):
         self._keep_going = True
 
     def _http_client(self):
+        """
+        Create an httpx client to interface with the service.
+        Notes:
+            httpx clients are not thread-safe
+        """
         return Client(base_url=self._service_url, **self._http_client_args)
 
     def _declare_loop(self):
+        """
+        thread target to continuously declare new settings.
+        """
         http_client = self._http_client()
 
         def declare_setting(setting):
@@ -80,6 +102,10 @@ class SyncHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin):
                 self._undeclared.task_done()
 
     def _update_loop(self):
+        """
+        Thread target to continuously update declared settings.
+        """
+
         http_client = self._http_client()
 
         def update():
@@ -117,7 +143,6 @@ class SyncHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin):
         super().set_as_main()
 
         # check that we're dealing with the right context features
-        # check that we're dealing with the right context features
         try:
             response = self._http_client().get('/api/v1/context_features/')
             response.raise_for_status()
@@ -132,17 +157,21 @@ class SyncHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin):
                     'features_in_client': self._context_features
                 })
                 # we let the service decide the features to avoid future conflict
-                self._context_features = features_in_service
+                self._context_features = OrderedSet(features_in_service)
 
         self._declaration_thread = Thread(target=self._declare_loop, daemon=True)
         self._declaration_thread.start()
         self._undeclared.join()
-
+        # important to only start the update thread once all pending settings are declared, otherwise we may have
+        # stale settings
         self._update_thread = Thread(target=self._update_loop, daemon=True)
         self._update_thread.start()
         self.reload()
 
     def reload(self):
+        """
+        Block until all the tracked settings are up to date
+        """
         self._undeclared.join()
         self._update_event.clear()
         self._manual_update.set()
@@ -162,3 +191,12 @@ class SyncHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin):
                 'redundant_keys': redundant_keys
             })
         super().set_defaults(**kwargs)
+
+    def ping(self) -> None:
+        """
+        Check the health of the heksher server
+        Raises:
+            httpx.HTTPError, should any arise
+        """
+        response = self._http_client().get('/api/health')
+        response.raise_for_status()

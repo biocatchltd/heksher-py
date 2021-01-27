@@ -2,7 +2,8 @@ from copy import deepcopy
 from logging import ERROR, WARNING
 from time import sleep
 
-from pytest import mark
+from httpx import HTTPError
+from pytest import mark, raises
 
 from heksher.clients.sync_client import SyncHeksherClient
 from heksher.setting import Setting
@@ -154,3 +155,22 @@ def test_redundant_defaults(fake_heksher_service, caplog, monkeypatch):
         with SyncHeksherClient(fake_heksher_service.url, 1000, ['a', 'b', 'c']) as client:
             client.set_defaults(b='B', d='im redundant')
             assert setting.get(a='', c='') == 100
+
+
+def test_health_OK(fake_heksher_service):
+    client = SyncHeksherClient(fake_heksher_service.url, 1000, ['a', 'b', 'c'])
+    client.ping()
+
+
+def test_health_err(fake_heksher_service, monkeypatch):
+    monkeypatch.setattr(fake_heksher_service, 'health_response', 403)
+
+    client = SyncHeksherClient(fake_heksher_service.url, 1000, ['a', 'b', 'c'])
+    with raises(HTTPError):
+        client.ping()
+
+
+def test_health_unreachable():
+    client = SyncHeksherClient('http://notreal.fake.notreal', 1000, ['a', 'b', 'c'])
+    with raises(HTTPError):
+        client.ping()

@@ -12,6 +12,17 @@ T = TypeVar('T')
 # pytype: disable=invalid-annotation
 def collate_rules(keys: Sequence[str], rules: Iterable[Tuple[Sequence[Tuple[str, str]], T]]) -> RuleBranch[T]:
     # pytype: enable=invalid-annotation
+    """
+    Gather a set of rules into a rule-branch root
+    Args:
+        keys: The context features to collate by
+        rules: An iterable of rules to collate. Each rule is a two-tuple, first the sequence of exact-match condition
+         (in hierarchical order), the second the value.
+
+    Returns:
+        The rule branch root for the rules, using the context features.
+
+    """
     if not keys:
         # special case for no cfs, return value will be a single value
         rule_iter = iter(rules)
@@ -34,12 +45,15 @@ def collate_rules(keys: Sequence[str], rules: Iterable[Tuple[Sequence[Tuple[str,
 
     root = {}
     for conditions, value in rules:
+        # we constantly point the current node in the tree by storing its parent and the path to get there
         parent = None
         child_key = None  # root is without a path
         for cf, condition in zip_supersequence(keys, conditions, subseq_key=itemgetter(0)):
             if condition:
+                # exact_match condition
                 _, key = condition
             else:
+                # wildcard
                 key = None
 
             if parent is None:

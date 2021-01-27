@@ -1,5 +1,4 @@
 import json
-from urllib.parse import parse_qs
 
 from pytest import fixture
 from yellowbox.extras.http_server import HttpService, RouterHTTPRequestHandler
@@ -15,6 +14,7 @@ def fake_heksher_service():
         service.context_features = []
         service.query_response = None
         service.query_requests = []
+        service.health_response = 200
 
         service.url = f'http://127.0.0.1:{service.server_port}'
 
@@ -42,8 +42,13 @@ def fake_heksher_service():
                 return json.dumps(ret)
             return json.dumps({'rules': {}})
 
-        with declare, get_cfs, query:
+        @service.patch_route('GET', '/api/health')
+        def health(handler):
+            return service.health_response
+
+        with declare, get_cfs, query, health:
             yield service
+
 
 @fixture(autouse=True)
 def reset_main_client():

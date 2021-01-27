@@ -4,6 +4,7 @@ import collections.abc
 from abc import ABC, abstractmethod
 from enum import Enum, IntFlag
 from logging import getLogger
+from types import MappingProxyType
 from typing import Union, Type, Any
 
 import orjson
@@ -23,25 +24,44 @@ except ImportError:
     def get_origin(x):
         return getattr(x, '__origin__', None)
 
-# in the library, a setting type is just a string denoting the type's specs (in heksher format), with an additional
-# method to convert a JSON value to a more pythonic one (usually this will be a no-op)
-
 logger = getLogger(__name__)
 
 
 class SettingType(ABC):
+    """
+    Base class for setting types
+    """
     @abstractmethod
     def heksher_string(self) -> str:
+        """
+        Returns: The type as string, as specified by the Heksher specs
+        """
         pass
 
     @abstractmethod
     def convert(self, x):
-        # note that convert must only return x if it is immutable, passing mutable values through could be disastrous
+        """
+        Args:
+            x: JSON-parsed value, retrieved from http api
+
+        Returns:
+            x, converted to an immutable pythonic value
+
+        Notes:
+            convert must return an immutable value
+        """
         pass
 
 
 class SimpleSettingType(SettingType):
+    """
+    A setting type for immutable primitives
+    """
     def __init__(self, name):
+        """
+        Args:
+            name: The name of the primitive in heksher specs
+        """
         self.name = name
 
     def heksher_string(self) -> str:
@@ -52,7 +72,17 @@ class SimpleSettingType(SettingType):
 
 
 class FlagsType(SettingType):
+    """
+    A setting type for flags, reflecting a flags of strings in heksher service.
+    Notes:
+        Although the heksher type is a flag of strings, the python type must be an IntFlags, where the strings are the
+         member names.
+    """
     def __init__(self, flags_type: Type[IntFlag]):
+        """
+        Args:
+            flags_type: The IntFlags subclass to use as a type
+        """
         self.type_ = flags_type
 
     def heksher_string(self) -> str:
@@ -74,7 +104,14 @@ class FlagsType(SettingType):
 
 
 class EnumType(SettingType):
+    """
+    A setting type for an enum of primitive values
+    """
     def __init__(self, enum_type: Type[Enum]):
+        """
+        Args:
+            enum_type: The Enum subclass to use as a type
+        """
         self.type_ = enum_type
 
     def heksher_string(self) -> str:
@@ -85,25 +122,39 @@ class EnumType(SettingType):
 
 
 class GenericSequenceType(SettingType):
+    """
+    A setting type for a sequence type
+    """
     def __init__(self, inner: SettingType):
+        """
+        Args:
+            inner: the inner setting type of each member
+        """
         self.inner = inner
 
     def heksher_string(self) -> str:
         return f'Sequence<{self.inner.heksher_string()}>'
 
     def convert(self, x):
-        return [self.inner.convert(i) for i in x]
+        return tuple(self.inner.convert(i) for i in x)
 
 
 class GenericMappingType(SettingType):
+    """
+    A setting type for a mapping type with string keys
+    """
     def __init__(self, inner: SettingType):
+        """
+        Args:
+            inner: the inner setting type of each value in the
+        """
         self.inner = inner
 
     def heksher_string(self) -> str:
         return f'Mapping<{self.inner.heksher_string()}>'
 
     def convert(self, x):
-        return {k: self.inner.convert(v) for (k, v) in x.items()}
+        return MappingProxyType({k: self.inner.convert(v) for (k, v) in x.items()})
 
 
 if GenericAlias:
@@ -128,6 +179,15 @@ _simples = {
 
 
 def setting_type(py_type: SettingTypeInput) -> SettingType:  # pytype: disable=invalid-annotation
+    """
+    Parse a python type to a heksher setting type
+    Args:
+        py_type: the python type or genetic alias to parse
+
+    Returns:
+        A SettingType respective of py_type
+
+    """
     if isinstance(py_type, type):
         simple = _simples.get(py_type)
         if simple:
@@ -137,11 +197,11 @@ def setting_type(py_type: SettingTypeInput) -> SettingType:  # pytype: disable=i
         if issubclass(py_type, Enum):
             return EnumType(py_type)
     # we can't depend on GenericAlias to act the way we expect it to, we instead use get_origin and get_args
-    if get_origin(py_type) in (list, collections.abc.Sequence, collections.abc.MutableSequence):
+    if get_origin(py_type) is collections.abc.Sequence:
         arg, = get_args(py_type)
         inner = setting_type(arg)
         return GenericSequenceType(inner)
-    if get_origin(py_type) in (dict, collections.abc.Mapping, collections.abc.MutableMapping):
+    if get_origin(py_type) is collections.abc.Mapping:
         key_type, value_type = get_args(py_type)
         if key_type is not str:
             raise TypeError('the key for mapping setting types must always be str')

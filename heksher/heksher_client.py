@@ -21,20 +21,37 @@ class BaseHeksherClient(ABC):
 
     @abstractmethod
     def add_undeclared(self, settings: Collection[Setting]):
+        """
+        Register a setting to be declared.
+        Args:
+            settings: the setting that needs to be declared.
+        """
         pass
 
     @abstractmethod
-    def default_context_namespace(self) -> Mapping[str, str]:
+    def context_namespace(self, ns: Mapping[str, str]) -> Mapping[str, str]:
+        """
+        Create a context namespace for ruleset resolution, with context features and their values.
+        Args:
+            ns: namespace provided by the user, to be treated as overriding values.
+
+        Returns:
+            A new mapping combining ns and the client's state, to be used for ruleset resolution.
+
+        """
         pass
 
     def _set_as_main(self):
+        """
+        Internal method to transfer "main-ness" to self
+        """
         heksher.main_client.Main.handover_main(self)
         heksher.main_client.Main = self
 
 
 class TemporaryClient(BaseHeksherClient):
     """
-    A temporary client
+    A temporary client, to hold undeclared settings until another client takes over.
     """
 
     def __init__(self):
@@ -43,8 +60,8 @@ class TemporaryClient(BaseHeksherClient):
     def add_undeclared(self, settings: Collection[Setting]):
         self.undeclared.update(settings)
 
-    def default_context_namespace(self) -> Mapping[str, str]:
-        return {}
+    def context_namespace(self, ns: Mapping[str, str]) -> Mapping[str, str]:
+        return ns
 
     def handover_main(self, other: BaseHeksherClient):
         super().handover_main(other)

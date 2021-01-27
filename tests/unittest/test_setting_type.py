@@ -42,7 +42,7 @@ def test_sequence():
 
     t = setting_type(Sequence[Color])
     assert t.heksher_string() == 'Sequence<Enum["blue","green","red"]>'
-    assert t.convert(["green", "red", "blue", "green"]) == [Color.green, Color.red, Color.blue, Color.green]
+    assert t.convert(["green", "red", "blue", "green"]) == (Color.green, Color.red, Color.blue, Color.green)
 
 
 def test_mapping():

@@ -15,6 +15,7 @@ python = "^3.7"
 orjson = "^3.4.6"
 httpx = "^0.16.1"
 mock = {version="^4.0.3", markers = "python_version < '3.8'"}
+ordered-set = "^4.0.2"
 
 [tool.poetry.dev-dependencies]
 pytest = "*"
