@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from enum import Enum, IntFlag
 from logging import getLogger
 from types import MappingProxyType
-from typing import Union, Type, Any
+from typing import Type, Any
 
 import orjson
 
@@ -31,6 +31,7 @@ class SettingType(ABC):
     """
     Base class for setting types
     """
+
     @abstractmethod
     def heksher_string(self) -> str:
         """
@@ -57,6 +58,7 @@ class SimpleSettingType(SettingType):
     """
     A setting type for immutable primitives
     """
+
     def __init__(self, name):
         """
         Args:
@@ -78,6 +80,7 @@ class FlagsType(SettingType):
         Although the heksher type is a flag of strings, the python type must be an IntFlags, where the strings are the
          member names.
     """
+
     def __init__(self, flags_type: Type[IntFlag]):
         """
         Args:
@@ -107,6 +110,7 @@ class EnumType(SettingType):
     """
     A setting type for an enum of primitive values
     """
+
     def __init__(self, enum_type: Type[Enum]):
         """
         Args:
@@ -125,6 +129,7 @@ class GenericSequenceType(SettingType):
     """
     A setting type for a sequence type
     """
+
     def __init__(self, inner: SettingType):
         """
         Args:
@@ -143,6 +148,7 @@ class GenericMappingType(SettingType):
     """
     A setting type for a mapping type with string keys
     """
+
     def __init__(self, inner: SettingType):
         """
         Args:
@@ -157,19 +163,6 @@ class GenericMappingType(SettingType):
         return MappingProxyType({k: self.inner.convert(v) for (k, v) in x.items()})
 
 
-if GenericAlias:
-    SettingTypeInput = Union[  # pytype: disable=invalid-annotation
-        Type[str],
-        Type[bool],
-        Type[int],
-        Type[float],
-        GenericAlias,
-        Type[Enum],
-        Type[IntFlag],
-    ]
-else:
-    SettingTypeInput = Any
-
 _simples = {
     int: SimpleSettingType('int'),
     float: SimpleSettingType('float'),
@@ -178,7 +171,7 @@ _simples = {
 }
 
 
-def setting_type(py_type: SettingTypeInput) -> SettingType:  # pytype: disable=invalid-annotation
+def setting_type(py_type: Any) -> SettingType:  # pytype: disable=invalid-annotation
     """
     Parse a python type to a heksher setting type
     Args:

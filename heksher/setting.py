@@ -7,7 +7,7 @@ from typing import Generic, TypeVar, Sequence, Optional, Mapping, Any, NamedTupl
 
 import heksher.main_client
 from heksher.exceptions import NoMatchError
-from heksher.setting_type import SettingTypeInput, setting_type
+from heksher.setting_type import setting_type
 
 logger = getLogger(__name__)
 
@@ -21,13 +21,12 @@ class Setting(Generic[T]):
     A setting object, that stores a ruleset and can be updated by heksher clients
     """
 
-    def __init__(self, name: str, type_: SettingTypeInput,
-                 configurable_features: Sequence[str], default_value: T = MISSING,
+    def __init__(self, name: str, type, configurable_features: Sequence[str], default_value: T = MISSING,
                  metadata: Optional[Mapping[str, Any]] = None):
         """
         Args:
             name: The name of the setting.
-            type_: The type of the setting, either a primitive type (int, str, bool, float), an enum class, a FlagInt
+            type: The type of the setting, either a primitive type (int, str, bool, float), an enum class, a FlagInt
              class, or a generic alias of List or Dict.
             configurable_features: The configurable features of the setting.
             default_value: The default value of the setting, this value will be returned if no rules match the current
@@ -37,7 +36,7 @@ class Setting(Generic[T]):
             Creating a setting automatically registers it to be declared at the main heksher client.
         """
         self.name = name
-        self.type = setting_type(type_)
+        self.type = setting_type(type)
         self.configurable_features = configurable_features
         self.default_value = default_value
         self.metadata = metadata
