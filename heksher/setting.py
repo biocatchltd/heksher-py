@@ -143,7 +143,7 @@ class RuleSet(NamedTuple):
     The root rulebranch
     """
 
-    class RuleMatch(NamedTuple, Generic[T]):
+    class RuleMatch(NamedTuple):
         """
         An internal structure for resolution, representing a value belonging to a rule that matched the
          current namespace
