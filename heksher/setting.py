@@ -3,7 +3,7 @@ from __future__ import annotations
 from logging import getLogger
 from operator import attrgetter
 from weakref import ref
-from typing import Generic, TypeVar, Sequence, Optional, Mapping, Any, NamedTuple, Union, Tuple
+from typing import Generic, TypeVar, Sequence, Optional, Mapping, Any, NamedTuple, Union
 
 import heksher.main_client
 from heksher.exceptions import NoMatchError
@@ -126,6 +126,21 @@ Will be collated to the following rulebranch:
 """
 
 
+class RuleMatch(NamedTuple):
+    """
+    An internal structure for resolution, representing a value belonging to a rule that matched the
+     current namespace
+    """
+    value: T  # pytype: disable=not-supported-yet
+    """
+    The value of the matched rule
+    """
+    exact_match_depth: int
+    """
+    The index of the last context feature that had an exact match condition within the rule
+    """
+
+
 class RuleSet(NamedTuple):
     """
     A complete set of rules, resolvable through a namespace
@@ -142,20 +157,6 @@ class RuleSet(NamedTuple):
     """
     The root rulebranch
     """
-
-    class RuleMatch(NamedTuple):
-        """
-        An internal structure for resolution, representing a value belonging to a rule that matched the
-         current namespace
-        """
-        value: T  # pytype: disable=not-supported-yet
-        """
-        The value of the matched rule
-        """
-        exact_match_depth: int
-        """
-        The index of the last context feature that had an exact match condition within the rule 
-        """
 
     def resolve(self, context_namespace: Mapping[str, str]):
         """
@@ -174,7 +175,7 @@ class RuleSet(NamedTuple):
             context_namespace = client.context_namespace(context_namespace)
 
         def _resolve(current: RuleBranch[T], depth: int = 0, exact_match_depth: int = -1) \
-                -> Union[RuleSet.RuleMatch, bool]:  # my kingdom for a Literal!
+                -> Union[RuleMatch, bool]:  # my kingdom for a Literal!
             """
             Args:
                 current: The branch being resolved
@@ -188,7 +189,7 @@ class RuleSet(NamedTuple):
             """
             if depth == len(self.context_features):
                 # leaf node
-                return self.RuleMatch(current, exact_match_depth)
+                return RuleMatch(current, exact_match_depth)
 
             feature = self.context_features[depth]
             feature_value = context_namespace.get(feature)
@@ -208,5 +209,5 @@ class RuleSet(NamedTuple):
         ret = _resolve(self.root)
         if not ret:
             raise NoMatchError
-        assert isinstance(ret, self.RuleMatch)
+        assert isinstance(ret, RuleMatch)
         return ret.value

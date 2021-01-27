@@ -30,7 +30,7 @@ class Rule(Generic[T]):
     The match conditions for the rule, with "None" as a wildcard.
     Notes:
         in StubClients, when multiple rules are given, they must have the exact same keys, in exactly the same order.
-        These keys will be interpreted as the setting's context features. 
+        These keys will be interpreted as the setting's context features.
     """
     value: T  # pytype: disable=not-supported-yet
     """
