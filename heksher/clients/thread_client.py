@@ -196,7 +196,7 @@ class ThreadHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin
         """
         Check the health of the heksher server
         Raises:
-            httpx.HTTPError, should any arise
+            httpx.HTTPError, if an error occurs
         """
         response = self._http_client().get('/api/health')
         response.raise_for_status()

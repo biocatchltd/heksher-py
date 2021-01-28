@@ -56,11 +56,8 @@ class StubClient(ContextFeaturesMixin):
             self.setting.last_ruleset = self.previous
             return None
 
-    def add_undeclared(self, settings):
+    def add_settings(self, settings):
         pass
-
-    def handover_main(self, other):
-        raise RuntimeError(f'cannot handover from {type(self)}')
 
     def track_contexts(self, **context_values: Union[str, Collection[str]]):
         pass

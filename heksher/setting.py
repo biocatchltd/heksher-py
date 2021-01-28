@@ -43,7 +43,7 @@ class Setting(Generic[T]):
 
         self.last_ruleset: Optional[RuleSet] = None
 
-        heksher.main_client.Main.add_undeclared((self,))  # pytype: disable=pyi-error
+        heksher.main_client.Main.add_settings((self,))  # pytype: disable=pyi-error
 
     def get(self, **contexts) -> T:
         """

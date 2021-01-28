@@ -10,17 +10,7 @@ from heksher.setting import Setting
 
 class BaseHeksherClient(ABC):
     @abstractmethod
-    def handover_main(self, other: BaseHeksherClient):
-        """
-        attempt to hand over the "main"-ness of the client from self to other. Might fail if self feels this
-        shouldn't happen. Calling this when self is not the main client will result in a runtime error. Note that this
-        method should only handle the stopping and cleanup of self, and not start other.
-        """
-        if heksher.main_client.Main is not self:
-            raise RuntimeError('self must be the main client')
-
-    @abstractmethod
-    def add_undeclared(self, settings: Collection[Setting]):
+    def add_settings(self, settings: Collection[Setting]):
         """
         Register a setting to be declared.
         Args:
@@ -29,11 +19,11 @@ class BaseHeksherClient(ABC):
         pass
 
     @abstractmethod
-    def context_namespace(self, ns: Mapping[str, str]) -> Mapping[str, str]:
+    def context_namespace(self, user_namespace: Mapping[str, str]) -> Mapping[str, str]:
         """
         Create a context namespace for ruleset resolution, with context features and their values.
         Args:
-            ns: namespace provided by the user, to be treated as overriding values.
+            user_namespace: namespace provided by the user, to be treated as overriding values.
 
         Returns:
             A new mapping combining ns and the client's state, to be used for ruleset resolution.
@@ -45,7 +35,9 @@ class BaseHeksherClient(ABC):
         """
         Internal method to transfer "main-ness" to self
         """
-        heksher.main_client.Main.handover_main(self)
+        if not isinstance(heksher.main_client.Main, TemporaryClient):
+            raise TypeError(f'cannot remove cliant of type {type(heksher.main_client.Main).__name__} from main')
+        self.add_settings(heksher.main_client.Main.undeclared)
         heksher.main_client.Main = self
 
 
@@ -57,15 +49,11 @@ class TemporaryClient(BaseHeksherClient):
     def __init__(self):
         self.undeclared: WeakSet = WeakSet()
 
-    def add_undeclared(self, settings: Collection[Setting]):
+    def add_settings(self, settings: Collection[Setting]):
         self.undeclared.update(settings)
 
-    def context_namespace(self, ns: Mapping[str, str]) -> Mapping[str, str]:
-        return ns
-
-    def handover_main(self, other: BaseHeksherClient):
-        super().handover_main(other)
-        other.add_undeclared(self.undeclared)
+    def context_namespace(self, user_namespace: Mapping[str, str]) -> Mapping[str, str]:
+        return user_namespace
 
 
 heksher.main_client.Main = TemporaryClient()

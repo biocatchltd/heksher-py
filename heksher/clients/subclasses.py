@@ -55,10 +55,7 @@ class V1APIClient(BaseHeksherClient, ABC):
         # pytype: enable=invalid-annotation
         return collate_rules(self._context_features, rules)
 
-    def handover_main(self, other: BaseHeksherClient):
-        raise RuntimeError(f'cannot handover from {type(self)}')
-
-    def add_undeclared(self, settings):
+    def add_settings(self, settings):
         for s in settings:
             self._undeclared.put_nowait(s)
 
@@ -113,21 +110,21 @@ class V1APIClient(BaseHeksherClient, ABC):
             branch = self.collate_rules(rules)
             setting.update(self, self._context_features, branch)
 
-    def context_namespace(self, ns: Mapping[str, str]) -> Mapping[str, str]:
-        redundant_keys = ns.keys() - self._context_features
+    def context_namespace(self, user_namespace: Mapping[str, str]) -> Mapping[str, str]:
+        redundant_keys = user_namespace.keys() - self._context_features
         if redundant_keys:
             logger.warning('context features are not specified in server', extra={
                 'redundant_keys': redundant_keys
             })
 
-        for k, v in ns.items():
+        for k, v in user_namespace.items():
             if k in redundant_keys:
                 # all redundant keys have already been handled
                 continue
             if v not in self._tracked_context_options.get(k, ()):
                 logger.warning('context feature value is not tracked by client',
                                extra={'context_feature': k, 'context_feature_value': v})
-        return super().context_namespace(ns)
+        return super().context_namespace(user_namespace)
 
 
 class ContextFeaturesMixin(BaseHeksherClient, ABC):
@@ -152,9 +149,9 @@ class ContextFeaturesMixin(BaseHeksherClient, ABC):
             else:
                 self._contextvar_context_features[k] = v
 
-    def context_namespace(self, ns: Mapping[str, str]) -> Mapping[str, str]:
+    def context_namespace(self, user_namespace: Mapping[str, str]) -> Mapping[str, str]:
         ret = dict(self._const_context_features)
-        ret.update(ns)
+        ret.update(user_namespace)
 
         for k, cv in self._contextvar_context_features.items():
             if k in ret:
@@ -187,7 +184,6 @@ class ContextManagerMixin(BaseHeksherClient, ContextManager):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
-        return None
 
 
 class AsyncContextManagerMixin(BaseHeksherClient, AsyncContextManager):
@@ -208,4 +204,3 @@ class AsyncContextManagerMixin(BaseHeksherClient, AsyncContextManager):
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.close()
-        return None
