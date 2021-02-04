@@ -130,7 +130,6 @@ class ThreadHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin
             self._last_cache_time = new_cache_time
             logger.info('heksher reload done', extra={'updated_settings': updated_settings.keys()})
 
-
         while self._keep_going:
             try:
                 update()
