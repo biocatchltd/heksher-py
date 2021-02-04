@@ -6,6 +6,7 @@ from logging import ERROR, WARNING
 from httpx import HTTPError
 from pytest import mark, raises
 
+from heksher import TRACK_ALL
 from heksher.clients.async_client import AsyncHeksherClient
 from heksher.setting import Setting
 from tests.unittest.util import assert_logs
@@ -37,7 +38,7 @@ async def test_declare_before_main(fake_heksher_service, monkeypatch):
     }
 
     async with AsyncHeksherClient(fake_heksher_service.url, 10000000, ['a', 'b', 'c']):
-        assert setting.get(a='', b='', c='') == 100
+        assert setting.get(b='', c='') == 100
 
 
 @atest
@@ -51,7 +52,7 @@ async def test_declare_after_main(fake_heksher_service, monkeypatch):
         setting = Setting('cache_size', int, ['b', 'c'], 50)
         assert not client._undeclared.empty()
         await client._undeclared.join()
-        assert setting.get(a='', b='', c='') == 50
+        assert setting.get(b='', c='') == 50
 
         fake_heksher_service.query_response = {
             'rules': {
@@ -61,7 +62,7 @@ async def test_declare_after_main(fake_heksher_service, monkeypatch):
             }
         }
         await client.reload()
-        assert setting.get(a='', b='', c='') == 100
+        assert setting.get(b='', c='') == 100
 
 
 @atest
@@ -74,7 +75,7 @@ async def test_regular_update(fake_heksher_service, monkeypatch):
     setting = Setting('cache_size', int, ['b', 'c'], 50)
 
     async with AsyncHeksherClient(fake_heksher_service.url, 0.02, ['a', 'b', 'c']):
-        assert setting.get(a='', b='', c='') == 50
+        assert setting.get(b='', c='') == 50
         fake_heksher_service.query_response = {
             'rules': {
                 'cache_size': [
@@ -83,7 +84,7 @@ async def test_regular_update(fake_heksher_service, monkeypatch):
             }
         }
         await sleep(1)
-        assert setting.get(a='', b='', c='') == 100
+        assert setting.get(b='', c='') == 100
 
 
 @atest
@@ -92,7 +93,7 @@ async def test_heksher_unreachable(caplog):
     caplog.clear()
     with assert_logs(caplog, ERROR):
         async with AsyncHeksherClient('http://notreal.fake.notreal', 10000000, ['a', 'b', 'c']):
-            assert setting.get(a='', b='', c='') == 50
+            assert setting.get(b='', c='') == 50
 
 
 @atest
@@ -129,14 +130,14 @@ async def test_redundant_defaults(fake_heksher_service, caplog, monkeypatch):
     with assert_logs(caplog, WARNING):
         async with AsyncHeksherClient(fake_heksher_service.url, 1000, ['a', 'b', 'c']) as client:
             client.set_defaults(b='B', d='im redundant')
-            assert setting.get(a='', c='') == 100
+            assert setting.get(c='') == 100
 
 
 @atest
 async def test_trackcontexts(fake_heksher_service, monkeypatch):
     fake_heksher_service.query_requests.clear()
 
-    monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b', 'c'])
+    monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b', 'c', 'd'])
     monkeypatch.setitem(fake_heksher_service.declare_responses, 'cache_size', {
         'created': True, 'changed': [], 'incomplete': {}
     })
@@ -150,19 +151,21 @@ async def test_trackcontexts(fake_heksher_service, monkeypatch):
         }
     }
 
-    client = AsyncHeksherClient(fake_heksher_service.url, 100000, ['a', 'b', 'c'])
-    client.track_contexts(b='B', a=['a0', 'a1'])
+    client = AsyncHeksherClient(fake_heksher_service.url, 100000, ['a', 'b', 'c', 'd'])
+    client.track_contexts(b='B', a=['a0', 'a1'], d=TRACK_ALL)
 
     async with client:
-        assert setting.get(a='', b='B', c='') == 100
+        assert setting.get(b='B', c='') == 100
 
     order_invariant_requests = deepcopy(fake_heksher_service.query_requests)
     for req in order_invariant_requests:
-        req['context_features_options'] = {k: set(v) for (k, v) in req['context_features_options'].items()}
+        req['context_features_options'] = {
+            k: (v if isinstance(v, str) else set(v)) for (k, v) in req['context_features_options'].items()
+        }
 
     assert order_invariant_requests == [{
         'setting_names': ['cache_size'],
-        'context_features_options': {'b': {'B'}, 'a': {'a0', 'a1'}},
+        'context_features_options': {'b': {'B'}, 'a': {'a0', 'a1'}, 'd': '*'},
         'include_metadata': False,
     }]
 
@@ -172,6 +175,22 @@ async def test_redundant_trackings(caplog):
     client = AsyncHeksherClient('bla', 0, ['a', 'b', 'c'])
     with assert_logs(caplog, WARNING):
         client.track_contexts(a='j', d='t')
+
+
+@atest
+async def test_bad_tracking_all_first(caplog):
+    client = AsyncHeksherClient('bla', 0, ['a', 'b', 'c'])
+    client.track_contexts(a=TRACK_ALL)
+    with raises(RuntimeError):
+        client.track_contexts(a='a')
+
+
+@atest
+async def test_bad_tracking_all_second(caplog):
+    client = AsyncHeksherClient('bla', 0, ['a', 'b', 'c'])
+    client.track_contexts(a='a')
+    with raises(RuntimeError):
+        client.track_contexts(a=TRACK_ALL)
 
 
 @atest

@@ -21,6 +21,8 @@ logger = getLogger(__name__)
 
 T = TypeVar('T')
 
+TRACK_ALL = '*'
+
 
 class V1APIClient(BaseHeksherClient, ABC):
     """
@@ -37,7 +39,8 @@ class V1APIClient(BaseHeksherClient, ABC):
         super().__init__()
         self._context_features: OrderedSet[str] = OrderedSet(context_features)
 
-        self._tracked_context_options: Dict[str, Set[str]] = defaultdict(set)
+        self._tracked_context_options: Dict[str, Union[Set[str], str]] = defaultdict(set)
+        # the tracked options can also include the sentinel value TRACK_ALL
         self._tracked_settings: MutableMapping[str, Setting] = WeakValueDictionary()
 
     # pytype: disable=invalid-annotation
@@ -73,9 +76,20 @@ class V1APIClient(BaseHeksherClient, ABC):
                 'redundant_keys': redundant_keys
             })
         for k, v in context_values.items():
+            if v == TRACK_ALL:
+                if self._tracked_context_options.get(k) is not None:
+                    raise RuntimeError("cannot set TRACK_ALL to a feature that's already been used to track")
+                self._tracked_context_options[k] = TRACK_ALL
+                continue
             if isinstance(v, str):
                 v = (v,)
+            if self._tracked_context_options[k] == TRACK_ALL:
+                raise RuntimeError("cannot track a specific value after the feature's been set to TRACK_ALL")
             self._tracked_context_options[k].update(v)
+
+    def _context_feature_options(self):
+        return {k: (TRACK_ALL if v == TRACK_ALL else list(v))
+                for k, v in self._tracked_context_options.items()}
 
     def _handle_declaration_response(self, setting: Setting, response: Response):
         """
@@ -170,6 +184,7 @@ class ContextManagerMixin(BaseHeksherClient, ContextManager):
     """
     Mixin class to treat a client as a synchronous context manager
     """
+
     @abstractmethod
     def set_as_main(self):
         self._set_as_main()
@@ -190,6 +205,7 @@ class AsyncContextManagerMixin(BaseHeksherClient, AsyncContextManager):
     """
     Mixin class to treat a client as an asynchronous context manager
     """
+
     @abstractmethod
     async def set_as_main(self):
         self._set_as_main()

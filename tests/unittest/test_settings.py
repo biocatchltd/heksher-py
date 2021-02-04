@@ -13,7 +13,7 @@ from tests.unittest.util import assert_logs, assert_no_logs
 
 
 def test_resolve():
-    a = Setting('a', int, 'abc', default_value=-1)
+    a = Setting('a', int, 'abcx', default_value=-1)
     with SyncStubHeksherClient() as client, \
             client.patch(a, [
                 Rule({'x': '0'}, 0),
@@ -30,7 +30,7 @@ def test_resolve():
 
 
 def test_resolve_nodefault():
-    a = Setting('a', int, 'abc')
+    a = Setting('a', int, 'abcx')
     with SyncStubHeksherClient() as client, \
             client.patch(a, [
                 Rule({'x': '0'}, 0),
@@ -43,7 +43,7 @@ def test_resolve_nodefault():
 
 
 def test_multi_update():
-    a = Setting('a', int, 'abc', default_value=-1)
+    a = Setting('a', int, 'abcx', default_value=-1)
     with SyncStubHeksherClient() as client:
         client.patch(a, 10)
         assert a.get() == 10
@@ -58,7 +58,7 @@ def test_multi_update():
 
 
 def test_nested_update():
-    a = Setting('a', int, 'abc', default_value=-1)
+    a = Setting('a', int, 'abcx', default_value=-1)
     with SyncStubHeksherClient() as client:
         assert a.get() == -1
         with client.patch(a, 0):
@@ -70,7 +70,7 @@ def test_nested_update():
 
 
 def test_multi_switch(caplog):
-    a = Setting('a', int, 'abc', default_value=-1)
+    a = Setting('a', int, 'abcx', default_value=-1)
     c1 = SyncStubHeksherClient()
     c1.set_as_main()
     c1.patch(a, 10)
@@ -90,7 +90,7 @@ def test_multi_switch(caplog):
 
 
 def test_multi_switch_safe(caplog):
-    a = Setting('a', int, 'abc', default_value=-1)
+    a = Setting('a', int, 'abcx', default_value=-1)
     c1 = SyncStubHeksherClient()
     ref1 = ref(c1)
     c1.set_as_main()
@@ -111,3 +111,9 @@ def test_multi_switch_safe(caplog):
     assert a.get(x='0') == 0
     assert a.get(x='1') == 1
     assert a.get(x='15') == -1
+
+
+def test_useless_vals():
+    a = Setting('a', int, 'abcx', default_value=-1)
+    with raises(ValueError):
+        a.get(a='', b='', c='', x='', d='')

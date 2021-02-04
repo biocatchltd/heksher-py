@@ -5,6 +5,7 @@ from time import sleep
 from httpx import HTTPError
 from pytest import mark, raises
 
+from heksher import TRACK_ALL
 from heksher.clients.thread_client import ThreadHeksherClient
 from heksher.setting import Setting
 from tests.unittest.util import assert_logs
@@ -32,7 +33,7 @@ def test_declare_before_main(fake_heksher_service, monkeypatch):
     }
 
     with ThreadHeksherClient(fake_heksher_service.url, 100000, ['a', 'b', 'c']):
-        assert setting.get(a='', b='', c='') == 100
+        assert setting.get(b='', c='') == 100
 
 
 def test_declare_after_main(fake_heksher_service, monkeypatch):
@@ -45,7 +46,7 @@ def test_declare_after_main(fake_heksher_service, monkeypatch):
         setting = Setting('cache_size', int, ['b', 'c'], 50)
         assert not client._undeclared.empty()
         client._undeclared.join()
-        assert setting.get(a='', b='', c='') == 50
+        assert setting.get(b='', c='') == 50
 
         fake_heksher_service.query_response = {
             'rules': {
@@ -55,7 +56,7 @@ def test_declare_after_main(fake_heksher_service, monkeypatch):
             }
         }
         client.reload()
-        assert setting.get(a='', b='', c='') == 100
+        assert setting.get(b='', c='') == 100
 
 
 def test_regular_update(fake_heksher_service, monkeypatch):
@@ -67,7 +68,7 @@ def test_regular_update(fake_heksher_service, monkeypatch):
     setting = Setting('cache_size', int, ['b', 'c'], 50)
 
     with ThreadHeksherClient(fake_heksher_service.url, 0.02, ['a', 'b', 'c']):
-        assert setting.get(a='', b='', c='') == 50
+        assert setting.get(b='', c='') == 50
         fake_heksher_service.query_response = {
             'rules': {
                 'cache_size': [
@@ -76,7 +77,7 @@ def test_regular_update(fake_heksher_service, monkeypatch):
             }
         }
         sleep(0.1)
-        assert setting.get(a='', b='', c='') == 100
+        assert setting.get(b='', c='') == 100
 
 
 def test_heksher_unreachable(caplog):
@@ -84,13 +85,13 @@ def test_heksher_unreachable(caplog):
 
     with assert_logs(caplog, ERROR):
         with ThreadHeksherClient('http://notreal.fake.notreal', 10000, ['a', 'b', 'c']):
-            assert setting.get(a='', b='', c='') == 50
+            assert setting.get( b='', c='') == 50
 
 
 def test_trackcontexts(fake_heksher_service, monkeypatch):
     fake_heksher_service.query_requests.clear()
 
-    monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b', 'c'])
+    monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b', 'c', 'd'])
     monkeypatch.setitem(fake_heksher_service.declare_responses, 'cache_size', {
         'created': True, 'changed': [], 'incomplete': {}
     })
@@ -104,19 +105,21 @@ def test_trackcontexts(fake_heksher_service, monkeypatch):
         }
     }
 
-    client = ThreadHeksherClient(fake_heksher_service.url, 100000, ['a', 'b', 'c'])
-    client.track_contexts(b='B', a=['a0', 'a1'])
+    client = ThreadHeksherClient(fake_heksher_service.url, 100000, ['a', 'b', 'c', 'd'])
+    client.track_contexts(b='B', a=['a0', 'a1'], d=TRACK_ALL)
 
     with client:
-        assert setting.get(a='', b='B', c='') == 100
+        assert setting.get(b='B', c='') == 100
 
     order_invariant_requests = deepcopy(fake_heksher_service.query_requests)
     for req in order_invariant_requests:
-        req['context_features_options'] = {k: set(v) for (k, v) in req['context_features_options'].items()}
+        req['context_features_options'] = {
+            k: (v if isinstance(v, str) else set(v)) for (k, v) in req['context_features_options'].items()
+        }
 
     assert order_invariant_requests == [{
         'setting_names': ['cache_size'],
-        'context_features_options': {'b': {'B'}, 'a': {'a0', 'a1'}},
+        'context_features_options': {'b': {'B'}, 'a': {'a0', 'a1'}, 'd': '*'},
         'include_metadata': False,
     }]
 
@@ -154,7 +157,7 @@ def test_redundant_defaults(fake_heksher_service, caplog, monkeypatch):
     with assert_logs(caplog, WARNING):
         with ThreadHeksherClient(fake_heksher_service.url, 1000, ['a', 'b', 'c']) as client:
             client.set_defaults(b='B', d='im redundant')
-            assert setting.get(a='', c='') == 100
+            assert setting.get(c='') == 100
 
 
 def test_health_OK(fake_heksher_service):

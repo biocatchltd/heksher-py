@@ -82,7 +82,7 @@ class ThreadHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin
         def declare_setting(setting):
             declaration_data = {
                 'name': setting.name,
-                'configurable_features': setting.configurable_features,
+                'configurable_features': list(setting.configurable_features),
                 'type': setting.type.heksher_string(),
             }
             if setting.default_value is not MISSING:
@@ -114,7 +114,7 @@ class ThreadHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin
             logger.debug('heksher reload started')
             data = {
                 'setting_names': list(self._tracked_settings.keys()),
-                'context_features_options': {k: list(v) for k, v in self._tracked_context_options.items()},
+                'context_features_options': self._context_feature_options(),
                 'include_metadata': False,
             }
             if self._last_cache_time:

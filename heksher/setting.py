@@ -5,6 +5,8 @@ from operator import attrgetter
 from weakref import ref
 from typing import Generic, TypeVar, Sequence, Optional, Mapping, Any, NamedTuple, Union
 
+from ordered_set import OrderedSet
+
 import heksher.main_client
 from heksher.exceptions import NoMatchError
 from heksher.setting_type import setting_type
@@ -37,7 +39,7 @@ class Setting(Generic[T]):
         """
         self.name = name
         self.type = setting_type(type)
-        self.configurable_features = configurable_features
+        self.configurable_features = OrderedSet(configurable_features)
         self.default_value = default_value
         self.metadata = metadata
 
@@ -58,9 +60,13 @@ class Setting(Generic[T]):
         Raises:
             NoMatchError if no rules matched and a default value is not defined.
         """
+        redundant_keys = contexts.keys()-self.configurable_features
+        if redundant_keys:
+            raise ValueError(f'the following keys are not configurable: {redundant_keys}')
+
         if self.last_ruleset:
             try:
-                from_rules = self.last_ruleset.resolve(contexts)
+                from_rules = self.last_ruleset.resolve(contexts, self)
             except NoMatchError:
                 from_rules = MISSING
         else:
@@ -157,7 +163,7 @@ class RuleSet(NamedTuple):
     The root rulebranch
     """
 
-    def resolve(self, context_namespace: Mapping[str, str]):
+    def resolve(self, context_namespace: Mapping[str, str], setting: Setting):
         """
         Args:
             context_namespace: A namespace of context features and their values. If the client is available, its
@@ -191,12 +197,16 @@ class RuleSet(NamedTuple):
                 return RuleMatch(current, exact_match_depth)
 
             feature = self.context_features[depth]
-            feature_value = context_namespace.get(feature)
-            if feature_value is None:
-                raise RuntimeError(f'context feature {feature} is missing from both the default namespace and'
-                                   ' arguments')
+            if feature in setting.configurable_features:
+                feature_value = context_namespace.get(feature)
+                if feature_value is None:
+                    raise RuntimeError(f'configurable context feature {feature} is missing from both the default'
+                                       ' namespace and arguments')
 
-            exact = (feature_value in current) and _resolve(current[feature_value], depth + 1, depth)
+                exact = (feature_value in current) and _resolve(current[feature_value], depth + 1, depth)
+            else:
+                exact = None
+
             wildcard = (None in current) and _resolve(current[None], depth + 1, exact_match_depth)
 
             if exact and wildcard:
