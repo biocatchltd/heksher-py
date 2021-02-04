@@ -28,7 +28,7 @@ def fake_heksher_service():
                 return json.dumps(service.declare_responses['*'])
             return 422
 
-        @service.patch_route('GET', '/api/v1/context_features/')
+        @service.patch_route('GET', '/api/v1/context_features')
         def get_cfs(handler):
             return json.dumps({'context_features': service.context_features})
 

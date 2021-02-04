@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from asyncio import Task, Queue, Lock, Event, create_task, wait_for, TimeoutError
+from asyncio import Task, Queue, Lock, Event, create_task, wait_for, TimeoutError, CancelledError
 from contextvars import ContextVar
 from datetime import datetime
 from logging import getLogger
@@ -17,11 +17,14 @@ logger = getLogger(__name__)
 
 T = TypeVar('T')
 
+__all__ = ['AsyncClient']
+
 
 class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerMixin):
     """
     An asynchronous heksher client, using heksher's V1 HTTP API
     """
+
     def __init__(self, service_url: str, update_interval: float, context_features: Sequence[str], *,
                  http_client_args: Dict[str, Any] = None):
         """
@@ -76,6 +79,9 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
             setting = await self._undeclared.get()
             try:
                 await declare_setting(setting)  # pytype: disable=name-error
+            except CancelledError:
+                # in 3.7, cancelled is a normal exception
+                raise
             except Exception:
                 logger.exception('setting declaration failed',
                                  extra={'setting': setting.name})  # pytype: disable=name-error
@@ -91,7 +97,7 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
             logger.debug('heksher reload started')
             data = {
                 'setting_names': list(self._tracked_settings.keys()),
-                'cf_options': {k: list(v) for k, v in self._tracked_context_options.items()},
+                'context_features_options': {k: list(v) for k, v in self._tracked_context_options.items()},
                 'include_metadata': False,
             }
             if self._last_cache_time:
@@ -109,6 +115,9 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
         while True:
             try:
                 await update()
+            except CancelledError:
+                # in 3.7, cancelled is a normal exception
+                raise
             except Exception:
                 logger.exception('error during heksher update')
             finally:
@@ -126,7 +135,7 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
 
         # check that we're dealing with the right context features
         try:
-            response = await self._http_client.get('/api/v1/context_features/')
+            response = await self._http_client.get('/api/v1/context_features')
             response.raise_for_status()
         except HTTPError:
             logger.exception('failure to get context_features from heksher service',

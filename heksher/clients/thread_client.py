@@ -18,6 +18,8 @@ logger = getLogger(__name__)
 
 T = TypeVar('T')
 
+__all__ = ['ThreadHeksherClient']
+
 
 class ThreadHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin):
     """
@@ -112,7 +114,7 @@ class ThreadHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin
             logger.debug('heksher reload started')
             data = {
                 'setting_names': list(self._tracked_settings.keys()),
-                'cf_options': {k: list(v) for k, v in self._tracked_context_options.items()},
+                'context_features_options': {k: list(v) for k, v in self._tracked_context_options.items()},
                 'include_metadata': False,
             }
             if self._last_cache_time:
@@ -144,7 +146,7 @@ class ThreadHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin
 
         # check that we're dealing with the right context features
         try:
-            response = self._http_client().get('/api/v1/context_features/')
+            response = self._http_client().get('/api/v1/context_features')
             response.raise_for_status()
         except HTTPError:
             logger.exception('failure to get context_features from heksher service',

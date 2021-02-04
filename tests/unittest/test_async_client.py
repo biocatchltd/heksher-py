@@ -158,11 +158,11 @@ async def test_trackcontexts(fake_heksher_service, monkeypatch):
 
     order_invariant_requests = deepcopy(fake_heksher_service.query_requests)
     for req in order_invariant_requests:
-        req['cf_options'] = {k: set(v) for (k, v) in req['cf_options'].items()}
+        req['context_features_options'] = {k: set(v) for (k, v) in req['context_features_options'].items()}
 
     assert order_invariant_requests == [{
         'setting_names': ['cache_size'],
-        'cf_options': {'b': {'B'}, 'a': {'a0', 'a1'}},
+        'context_features_options': {'b': {'B'}, 'a': {'a0', 'a1'}},
         'include_metadata': False,
     }]
 
