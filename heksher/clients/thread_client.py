@@ -119,6 +119,7 @@ class ThreadHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin
             }
             if self._last_cache_time:
                 data['cache_time'] = self._last_cache_time.isoformat()
+            new_cache_time = datetime.now()
 
             response = http_client.request('GET', '/api/v1/rules/query', data=orjson.dumps(data))
             response.raise_for_status()
@@ -126,9 +127,9 @@ class ThreadHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin
             updated_settings = response.json()['rules']
             with self.modification_lock:
                 self._update_settings_from_query(updated_settings)
+            self._last_cache_time = new_cache_time
             logger.info('heksher reload done', extra={'updated_settings': updated_settings.keys()})
 
-            self._last_cache_time = datetime.now()
 
         while self._keep_going:
             try:
