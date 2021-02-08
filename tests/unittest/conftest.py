@@ -32,7 +32,7 @@ def fake_heksher_service():
         def get_cfs(handler):
             return json.dumps({'context_features': service.context_features})
 
-        @service.patch_route('GET', '/api/v1/rules/query')
+        @service.patch_route('POST', '/api/v1/rules/query')
         def query(handler):
             params = json.loads(handler.body())
             service.query_requests.append(params)
