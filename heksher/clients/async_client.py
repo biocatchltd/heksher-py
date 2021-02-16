@@ -69,6 +69,7 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
                 'name': setting.name,
                 'configurable_features': list(setting.configurable_features),
                 'type': setting.type.heksher_string(),
+                'metadata': setting.metadata,
             }
             if setting.default_value is not MISSING:
                 declaration_data['default_value'] = setting.default_value
