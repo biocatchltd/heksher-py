@@ -1,5 +1,7 @@
 # heksher Changelog
 ## unreleased
+#### Fixed
+* Removed redundant warning from `subclasses.py` when using `TRACK_ALL` feature.
 ### Internal
 * `poetry.lock`, `.coverage`, `pycache`, `coverage.xml` to gitignore
 * Make `scripts` files executable (+x) and add shebang to the header.

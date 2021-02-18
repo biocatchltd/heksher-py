@@ -135,7 +135,8 @@ class V1APIClient(BaseHeksherClient, ABC):
             if k in redundant_keys:
                 # all redundant keys have already been handled
                 continue
-            if v not in self._tracked_context_options.get(k, ()):
+            tracked_contexts_options = self._tracked_context_options.get(k, ())
+            if v not in tracked_contexts_options and tracked_contexts_options != TRACK_ALL:
                 logger.warning('context feature value is not tracked by client',
                                extra={'context_feature': k, 'context_feature_value': v})
         return super().context_namespace(user_namespace)
