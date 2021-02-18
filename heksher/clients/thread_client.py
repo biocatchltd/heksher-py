@@ -120,7 +120,7 @@ class ThreadHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin
             }
             if self._last_cache_time:
                 data['cache_time'] = self._last_cache_time.isoformat()
-            new_cache_time = datetime.now()
+            new_cache_time = datetime.utcnow()
 
             response = http_client.post('/api/v1/rules/query', data=orjson.dumps(data))
             response.raise_for_status()

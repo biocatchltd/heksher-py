@@ -103,7 +103,7 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
             }
             if self._last_cache_time:
                 data['cache_time'] = self._last_cache_time.isoformat()
-            new_cache_time = datetime.now()
+            new_cache_time = datetime.utcnow()
 
             response = await self._http_client.post('/api/v1/rules/query', data=orjson.dumps(data))
             response.raise_for_status()
