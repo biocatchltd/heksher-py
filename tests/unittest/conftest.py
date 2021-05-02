@@ -15,6 +15,7 @@ def fake_heksher_service():
         service.query_response = None
         service.query_requests = []
         service.health_response = 200
+        service.settings_response = {}
 
         service.url = f'http://127.0.0.1:{service.server_port}'
 
@@ -46,7 +47,11 @@ def fake_heksher_service():
         def health(handler):
             return service.health_response
 
-        with declare, get_cfs, query, health:
+        @service.patch_route('GET', '/api/v1/settings')
+        def get_settings(handler):
+            return service.settings_response
+
+        with declare, get_cfs, query, health, get_settings:
             yield service
 
 

@@ -158,7 +158,7 @@ class RuleSet(NamedTuple):
     """
     The context features the root rulebranch was collated against
     """
-    root: RuleBranch[T]
+    root: RuleBranch[T]  # pytype: disable=not-supported-yet
     """
     The root rulebranch
     """

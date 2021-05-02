@@ -1,9 +1,15 @@
 from logging import getLogger
+from dataclasses import dataclass
+
+import orjson
 from operator import itemgetter
-from typing import Iterable, Tuple, Sequence, TypeVar
+from typing import Iterable, Tuple, Sequence, TypeVar, List, Any, Dict
+
+from pydantic import BaseModel, Field  # pytype: disable=import-error
 
 from heksher.setting import RuleBranch, MISSING
 from heksher.util import zip_supersequence
+
 
 logger = getLogger(__name__)
 T = TypeVar('T')
@@ -70,3 +76,41 @@ def collate_rules(keys: Sequence[str], rules: Iterable[Tuple[Sequence[Tuple[str,
         assert parent is not None
         parent[child_key] = value
     return root
+
+
+def orjson_dumps(v, **kwargs):
+    return str(orjson.dumps(v, **kwargs), 'utf-8')
+
+
+class GetSettingsOutputWithData_Setting(BaseModel):  # pytype: disable=base-class-error
+    name: str = Field(description="The name of the setting")
+    configurable_features: List[str] = Field(
+        description="a list of the context features the setting can be configured"
+                    " by")
+    type: str = Field(description="the type of the setting")
+    default_value: Any = Field(description="the default value of the setting")
+    metadata: Dict[str, Any] = Field(description="additional metadata of the setting")
+
+
+class GetSettingsOutputWithData(BaseModel):  # pytype: disable=base-class-error
+    settings: List[GetSettingsOutputWithData_Setting] = Field(description="A list of all the setting, sorted by name")
+
+    class Config:
+        json_dumps = orjson_dumps
+        json_loads = orjson.loads
+
+
+@dataclass
+class SettingData:
+    name: str
+    configurable_features: List[str]
+    type: str
+    default_value: Any
+    metadata: Dict[str, Any]
+
+
+def to_settings_spec(settings: GetSettingsOutputWithData) -> List[SettingData]:
+    settings_data = []
+    for setting in settings.settings:
+        settings_data.append(SettingData(**setting.dict()))
+    return settings_data
