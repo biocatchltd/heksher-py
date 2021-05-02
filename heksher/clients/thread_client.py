@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-
 from contextvars import ContextVar
 from datetime import datetime
 from logging import getLogger
@@ -14,7 +12,7 @@ from httpx import Client, HTTPError
 from ordered_set import OrderedSet
 
 from heksher.clients.subclasses import V1APIClient, ContextFeaturesMixin, ContextManagerMixin
-from heksher.clients.util import GetSettingsOutputWithData, SettingData, to_settings_spec
+from heksher.clients.util import SettingsOutput, SettingData
 from heksher.setting import Setting, MISSING
 
 logger = getLogger(__name__)
@@ -211,8 +209,8 @@ class ThreadHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin
         """
         List all the settings in the service
         """
-        request_data = {'include_additional_data': True}
-        response = self._http_client().get('/api/v1/settings', params=json.dumps(request_data))
-        settings = GetSettingsOutputWithData.parse_obj(response.json())
-        settings = to_settings_spec(settings)
+        response = self._http_client().get('/api/v1/settings', params=orjson.dumps(
+            {'include_additional_data': True}))
+        response.raise_for_status()
+        settings = SettingsOutput.parse_obj(response.json()).to_settings_data()
         return settings

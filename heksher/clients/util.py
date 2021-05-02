@@ -5,7 +5,7 @@ import orjson
 from operator import itemgetter
 from typing import Iterable, Tuple, Sequence, TypeVar, List, Any, Dict
 
-from pydantic import BaseModel, Field  # pytype: disable=import-error
+from pydantic import BaseModel  # pytype: disable=import-error
 
 from heksher.setting import RuleBranch, MISSING
 from heksher.util import zip_supersequence
@@ -83,21 +83,31 @@ def orjson_dumps(v, **kwargs):
 
 
 class GetSettingsOutputWithData_Setting(BaseModel):  # pytype: disable=base-class-error
-    name: str = Field(description="The name of the setting")
-    configurable_features: List[str] = Field(
-        description="a list of the context features the setting can be configured"
-                    " by")
-    type: str = Field(description="the type of the setting")
-    default_value: Any = Field(description="the default value of the setting")
-    metadata: Dict[str, Any] = Field(description="additional metadata of the setting")
+    name: str
+    configurable_features: List[str]
+    type: str
+    default_value: Any
+    metadata: Dict[str, Any]
 
 
-class GetSettingsOutputWithData(BaseModel):  # pytype: disable=base-class-error
-    settings: List[GetSettingsOutputWithData_Setting] = Field(description="A list of all the setting, sorted by name")
+class SettingsOutput(BaseModel):  # pytype: disable=base-class-error
+    settings: List[GetSettingsOutputWithData_Setting]
 
     class Config:
         json_dumps = orjson_dumps
         json_loads = orjson.loads
+
+    def to_settings_data(self) -> List:
+        settings_data = []
+        for setting in self.settings:
+            settings_data.append(SettingData(
+                name=setting.name,
+                configurable_features=setting.configurable_features,
+                type=setting.type,
+                default_value=setting.default_value,
+                metadata=setting.metadata,
+                ))
+        return settings_data
 
 
 @dataclass
@@ -107,10 +117,3 @@ class SettingData:
     type: str
     default_value: Any
     metadata: Dict[str, Any]
-
-
-def to_settings_spec(settings: GetSettingsOutputWithData) -> List[SettingData]:
-    settings_data = []
-    for setting in settings.settings:
-        settings_data.append(SettingData(**setting.dict()))
-    return settings_data
