@@ -186,7 +186,7 @@ def test_get_settings(fake_heksher_service, monkeypatch):
     monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b', 'c'])
     settings = {'settings': [
         {
-            'name': 'settings',
+            'name': 'foo',
             'configurable_features': ['a', 'b'],
             'type': 'int',
             'default_value': None,
@@ -196,9 +196,9 @@ def test_get_settings(fake_heksher_service, monkeypatch):
     monkeypatch.setattr(fake_heksher_service, 'settings_response', orjson.dumps(settings))
     with ThreadHeksherClient(fake_heksher_service.url, 1000, ['a', 'b', 'c']) as client:
         response = client.get_settings()
-        assert response == {"settings": SettingData(name="settings",
-                                                    configurable_features=['a', 'b'],
-                                                    type='int',
-                                                    default_value=None,
-                                                    metadata={})
+        assert response == {"foo": SettingData(name="foo",
+                                               configurable_features=['a', 'b'],
+                                               type='int',
+                                               default_value=None,
+                                               metadata={})
                             }

@@ -107,7 +107,7 @@ class SettingsOutput(BaseModel):  # pytype: disable=base-class-error
         json_loads = orjson.loads
 
     def to_settings_data(self) -> Dict:
-        return {setting.to_setting_data().name: setting.to_setting_data() for setting in self.settings}
+        return {setting.name: setting.to_setting_data() for setting in self.settings}
 
 
 @dataclass
