@@ -5,13 +5,14 @@ from datetime import datetime
 from logging import getLogger
 from queue import Queue, Empty
 from threading import Thread, Lock, Event
-from typing import Optional, Dict, Sequence, Any, TypeVar, Union
+from typing import Optional, Dict, Sequence, Any, TypeVar, Union, List
 
 import orjson
 from httpx import Client, HTTPError
 from ordered_set import OrderedSet
 
 from heksher.clients.subclasses import V1APIClient, ContextFeaturesMixin, ContextManagerMixin
+from heksher.clients.util import SettingsOutput, SettingData
 from heksher.setting import Setting, MISSING
 
 logger = getLogger(__name__)
@@ -203,3 +204,13 @@ class ThreadHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin
         """
         response = self._http_client().get('/api/health')
         response.raise_for_status()
+
+    def get_settings(self) -> List[SettingData]:
+        """
+        List all the settings in the service
+        """
+        response = self._http_client().get('/api/v1/settings', params=orjson.dumps(
+            {'include_additional_data': True}))
+        response.raise_for_status()
+        settings = SettingsOutput.parse_obj(response.json()).to_settings_data()
+        return settings

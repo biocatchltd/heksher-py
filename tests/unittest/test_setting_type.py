@@ -3,7 +3,7 @@ from typing import Sequence, Mapping
 
 from pytest import raises
 
-from heksher.setting_type import setting_type, SettingType
+from heksher.setting_type import setting_type
 
 
 def test_enum_type():

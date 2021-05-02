@@ -1,5 +1,7 @@
 from copy import deepcopy
 from logging import ERROR, WARNING
+
+import orjson
 from time import sleep
 
 from httpx import HTTPError
@@ -7,6 +9,7 @@ from pytest import mark, raises
 
 from heksher import TRACK_ALL
 from heksher.clients.thread_client import ThreadHeksherClient
+from heksher.clients.util import SettingData
 from heksher.setting import Setting
 from tests.unittest.util import assert_logs
 
@@ -24,13 +27,13 @@ def test_declare_before_main(fake_heksher_service, monkeypatch):
     })
 
     setting = Setting('cache_size', int, ['b', 'c'], 50)
-    fake_heksher_service.query_response = {
+    monkeypatch.setattr(fake_heksher_service, 'query_response', {
         'rules': {
             'cache_size': [
                 {'context_features': [], 'value': 100}
             ]
         }
-    }
+    })
 
     with ThreadHeksherClient(fake_heksher_service.url, 100000, ['a', 'b', 'c']):
         assert setting.get(b='', c='') == 100
@@ -48,13 +51,13 @@ def test_declare_after_main(fake_heksher_service, monkeypatch):
         client._undeclared.join()
         assert setting.get(b='', c='') == 50
 
-        fake_heksher_service.query_response = {
+        monkeypatch.setattr(fake_heksher_service, 'query_response', {
             'rules': {
                 'cache_size': [
                     {'context_features': [], 'value': 100}
                 ]
             }
-        }
+        })
         client.reload()
         assert setting.get(b='', c='') == 100
 
@@ -69,13 +72,13 @@ def test_regular_update(fake_heksher_service, monkeypatch):
 
     with ThreadHeksherClient(fake_heksher_service.url, 0.02, ['a', 'b', 'c']):
         assert setting.get(b='', c='') == 50
-        fake_heksher_service.query_response = {
+        monkeypatch.setattr(fake_heksher_service, 'query_response', {
             'rules': {
                 'cache_size': [
                     {'context_features': [], 'value': 100}
                 ]
             }
-        }
+        })
         sleep(0.1)
         assert setting.get(b='', c='') == 100
 
@@ -85,7 +88,7 @@ def test_heksher_unreachable(caplog):
 
     with assert_logs(caplog, ERROR):
         with ThreadHeksherClient('http://notreal.fake.notreal', 10000, ['a', 'b', 'c']):
-            assert setting.get( b='', c='') == 50
+            assert setting.get(b='', c='') == 50
 
 
 def test_trackcontexts(fake_heksher_service, monkeypatch):
@@ -97,13 +100,13 @@ def test_trackcontexts(fake_heksher_service, monkeypatch):
     })
 
     setting = Setting('cache_size', int, ['b', 'c'], 50)
-    fake_heksher_service.query_response = {
+    monkeypatch.setattr(fake_heksher_service, 'query_response', {
         'rules': {
             'cache_size': [
                 {'context_features': [['b', 'B']], 'value': 100}
             ]
         }
-    }
+    })
 
     client = ThreadHeksherClient(fake_heksher_service.url, 100000, ['a', 'b', 'c', 'd'])
     client.track_contexts(b='B', a=['a0', 'a1'], d=TRACK_ALL)
@@ -146,13 +149,13 @@ def test_redundant_defaults(fake_heksher_service, caplog, monkeypatch):
     })
 
     setting = Setting('cache_size', int, ['b', 'c'], 50)
-    fake_heksher_service.query_response = {
+    monkeypatch.setattr(fake_heksher_service, 'query_response', {
         'rules': {
             'cache_size': [
                 {'context_features': [['b', 'B']], 'value': 100}
             ]
         }
-    }
+    })
 
     with assert_logs(caplog, WARNING):
         with ThreadHeksherClient(fake_heksher_service.url, 1000, ['a', 'b', 'c']) as client:
@@ -177,3 +180,25 @@ def test_health_unreachable():
     client = ThreadHeksherClient('http://notreal.fake.notreal', 1000, ['a', 'b', 'c'])
     with raises(HTTPError):
         client.ping()
+
+
+def test_get_settings(fake_heksher_service, monkeypatch):
+    monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b', 'c'])
+    settings = {'settings': [
+        {
+            'name': 'foo',
+            'configurable_features': ['a', 'b'],
+            'type': 'int',
+            'default_value': None,
+            'metadata': {}
+        }
+    ]}
+    monkeypatch.setattr(fake_heksher_service, 'settings_response', orjson.dumps(settings))
+    with ThreadHeksherClient(fake_heksher_service.url, 1000, ['a', 'b', 'c']) as client:
+        response = client.get_settings()
+        assert response == {"foo": SettingData(name="foo",
+                                               configurable_features=['a', 'b'],
+                                               type='int',
+                                               default_value=None,
+                                               metadata={})
+                            }

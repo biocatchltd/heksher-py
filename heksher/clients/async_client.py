@@ -4,13 +4,14 @@ from asyncio import Task, Queue, Lock, Event, create_task, wait_for, TimeoutErro
 from contextvars import ContextVar
 from datetime import datetime
 from logging import getLogger
-from typing import Optional, NoReturn, Dict, Sequence, Any, TypeVar, Union
+from typing import Optional, NoReturn, Dict, Sequence, Any, TypeVar, Union, List
 
 import orjson
 from httpx import AsyncClient, HTTPError
 from ordered_set import OrderedSet
 
 from heksher.clients.subclasses import V1APIClient, ContextFeaturesMixin, AsyncContextManagerMixin
+from heksher.clients.util import SettingsOutput, SettingData
 from heksher.setting import Setting, MISSING
 
 logger = getLogger(__name__)
@@ -192,3 +193,13 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
         """
         response = await self._http_client.get('/api/health')
         response.raise_for_status()
+
+    async def get_settings(self) -> List[SettingData]:
+        """
+        List all the settings in the service
+        """
+        response = await self._http_client.get('/api/v1/settings', params=orjson.dumps(
+            {'include_additional_data': True}))
+        response.raise_for_status()
+        settings = SettingsOutput.parse_obj(response.json()).to_settings_data()
+        return settings
