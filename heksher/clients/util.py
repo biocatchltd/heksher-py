@@ -1,10 +1,10 @@
 from logging import getLogger
 from dataclasses import dataclass
 
-import orjson
 from operator import itemgetter
 from typing import Iterable, Tuple, Sequence, TypeVar, List, Any, Dict
 
+import orjson
 from pydantic import BaseModel  # pytype: disable=import-error
 
 from heksher.setting import RuleBranch, MISSING
@@ -82,32 +82,32 @@ def orjson_dumps(v, **kwargs):
     return str(orjson.dumps(v, **kwargs), 'utf-8')
 
 
-class GetSettingsOutputWithData_Setting(BaseModel):  # pytype: disable=base-class-error
+class SingleSettingData(BaseModel):  # pytype: disable=base-class-error
     name: str
     configurable_features: List[str]
     type: str
     default_value: Any
     metadata: Dict[str, Any]
 
+    def to_setting_data(self):
+        return SettingData(
+            name=self.name,
+            configurable_features=self.configurable_features,
+            type=self.type,
+            default_value=self.default_value,
+            metadata=self.metadata,
+            )
+
 
 class SettingsOutput(BaseModel):  # pytype: disable=base-class-error
-    settings: List[GetSettingsOutputWithData_Setting]
+    settings: List[SingleSettingData]
 
     class Config:
         json_dumps = orjson_dumps
         json_loads = orjson.loads
 
-    def to_settings_data(self) -> List:
-        settings_data = []
-        for setting in self.settings:
-            settings_data.append(SettingData(
-                name=setting.name,
-                configurable_features=setting.configurable_features,
-                type=setting.type,
-                default_value=setting.default_value,
-                metadata=setting.metadata,
-                ))
-        return settings_data
+    def to_settings_data(self) -> Dict:
+        return {setting.to_setting_data().name: setting.to_setting_data() for setting in self.settings}
 
 
 @dataclass

@@ -1,5 +1,6 @@
 # heksher Changelog
 ## unreleased
+* Added get_settings method to thread and async clients
 ## 0.1.2
 #### Fixed
 * Removed redundant warning from `subclasses.py` when using `TRACK_ALL` feature.

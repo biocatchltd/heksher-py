@@ -278,10 +278,9 @@ async def test_get_settings(fake_heksher_service, monkeypatch):
     monkeypatch.setattr(fake_heksher_service, 'settings_response', orjson.dumps(settings))
     async with AsyncHeksherClient(fake_heksher_service.url, 10000000, ['a', 'b', 'c']) as client:
         response = await client.get_settings()
-        assert response == [
-            SettingData(name="settings",
-                        configurable_features=['a', 'b'],
-                        type='int',
-                        default_value=None,
-                        metadata={})
-        ]
+        assert response == {"settings": SettingData(name="settings",
+                                                    configurable_features=['a', 'b'],
+                                                    type='int',
+                                                    default_value=None,
+                                                    metadata={})
+                            }
