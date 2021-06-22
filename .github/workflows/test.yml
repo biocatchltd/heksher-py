@@ -34,7 +34,7 @@ jobs:
         sh scripts/install.sh
     - name: Tests
       run: |
-        sh scripts/unittest.sh
+        poetry run sh scripts/unittest.sh
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v1
       with:
@@ -42,4 +42,4 @@ jobs:
         flags: unittests
     - name: Lint
       run: |
-        sh scripts/lint.sh
+        poetry run sh scripts/lint.sh
