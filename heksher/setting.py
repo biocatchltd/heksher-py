@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from logging import getLogger
 from operator import attrgetter
+from typing import Any, Generic, Mapping, Optional, Sequence, TypeVar, Union
 from weakref import ref
-from typing import Generic, TypeVar, Sequence, Optional, Mapping, Any, NamedTuple, Union
 
 from ordered_set import OrderedSet
 
@@ -23,7 +24,8 @@ class Setting(Generic[T]):
     A setting object, that stores a ruleset and can be updated by heksher clients
     """
 
-    def __init__(self, name: str, type, configurable_features: Sequence[str], default_value: T = MISSING,
+    def __init__(self, name: str, type, configurable_features: Sequence[str],
+                 default_value: T = MISSING,  # type: ignore
                  metadata: Optional[Mapping[str, Any]] = None):
         """
         Args:
@@ -45,7 +47,7 @@ class Setting(Generic[T]):
 
         self.last_ruleset: Optional[RuleSet] = None
 
-        heksher.main_client.Main.add_settings((self,))  # pytype: disable=pyi-error
+        heksher.main_client.Main.add_settings((self,))
 
     def get(self, **contexts) -> T:
         """
@@ -60,7 +62,7 @@ class Setting(Generic[T]):
         Raises:
             NoMatchError if no rules matched and a default value is not defined.
         """
-        redundant_keys = contexts.keys()-self.configurable_features
+        redundant_keys = contexts.keys() - self.configurable_features
         if redundant_keys:
             raise ValueError(f'the following keys are not configurable: {redundant_keys}')
 
@@ -96,7 +98,7 @@ class Setting(Generic[T]):
         self.last_ruleset = RuleSet(ref(client), context_features, root)
 
 
-RuleBranch = Union[Mapping[Optional[str], 'RuleBranch[T]'], T]  # pytype: disable=not-supported-yet
+RuleBranch = Union[Mapping[Optional[str], 'RuleBranch[T]'], T]  # type: ignore[misc]
 """
 A RuleBranch is a nested collation of rules or sub-rules, stored in a uniform-depth tree structure.
 For example, the following set of rules:
@@ -131,12 +133,13 @@ Will be collated to the following rulebranch:
 """
 
 
-class RuleMatch(NamedTuple):
+@dataclass(frozen=True)
+class RuleMatch(Generic[T]):
     """
     An internal structure for resolution, representing a value belonging to a rule that matched the
      current namespace
     """
-    value: T  # pytype: disable=not-supported-yet
+    value: T
     """
     The value of the matched rule
     """
@@ -146,7 +149,8 @@ class RuleMatch(NamedTuple):
     """
 
 
-class RuleSet(NamedTuple):
+@dataclass(frozen=True)
+class RuleSet(Generic[T]):
     """
     A complete set of rules, resolvable through a namespace
     """
@@ -158,7 +162,7 @@ class RuleSet(NamedTuple):
     """
     The context features the root rulebranch was collated against
     """
-    root: RuleBranch[T]  # pytype: disable=not-supported-yet
+    root: RuleBranch[T]
     """
     The root rulebranch
     """
@@ -195,6 +199,8 @@ class RuleSet(NamedTuple):
             if depth == len(self.context_features):
                 # leaf node
                 return RuleMatch(current, exact_match_depth)
+
+            assert isinstance(current, Mapping)
 
             feature = self.context_features[depth]
             if feature in setting.configurable_features:

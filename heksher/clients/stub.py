@@ -2,16 +2,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from itertools import groupby
-from typing import TypeVar, Mapping, Optional, Generic, Union, Collection, ContextManager
+from typing import Collection, ContextManager, Generic, Mapping, Optional, TypeVar, Union
 from unittest.mock import MagicMock
 
 try:
-    from unittest.mock import AsyncMock  # pytype: disable=import-error
+    from unittest.mock import AsyncMock  # type: ignore[attr-defined]
 except ImportError:
     # asyncmock only available for python 3.8 and up, for earlier versions, we use the backport
-    from mock import AsyncMock  # pytype: disable=import-error
+    from mock import AsyncMock  # type: ignore[attr-defined]
 
-from heksher.clients.subclasses import ContextFeaturesMixin, AsyncContextManagerMixin, ContextManagerMixin
+from heksher.clients.subclasses import AsyncContextManagerMixin, ContextFeaturesMixin, ContextManagerMixin
 from heksher.clients.util import collate_rules
 from heksher.setting import Setting
 
@@ -32,7 +32,7 @@ class Rule(Generic[T]):
         in StubClients, when multiple rules are given, they must have the exact same keys, in exactly the same order.
         These keys will be interpreted as the setting's context features.
     """
-    value: T  # pytype: disable=not-supported-yet
+    value: T
     """
     The value of a setting that matches the conditions
     """
@@ -93,7 +93,7 @@ class StubClient(ContextFeaturesMixin):
             root = collate_rules(first, rules)
             setting.update(self, first, root)
         else:
-            setting.update(self, (), value)
+            setting.update(self, (), value)  # type: ignore
 
         return ret
 

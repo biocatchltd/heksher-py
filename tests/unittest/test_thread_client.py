@@ -1,9 +1,8 @@
 from copy import deepcopy
 from logging import ERROR, WARNING
-
-import orjson
 from time import sleep
 
+import orjson
 from httpx import HTTPError
 from pytest import mark, raises
 

@@ -5,24 +5,24 @@ from abc import ABC, abstractmethod
 from enum import Enum, IntFlag
 from logging import getLogger
 from types import MappingProxyType
-from typing import Type, Any
+from typing import Any, Optional, Tuple, Type
 
 import orjson
 
 try:
-    from types import GenericAlias  # pytype: disable=import-error
+    from types import GenericAlias  # type: ignore[attr-defined]
 except ImportError:
-    GenericAlias = None
+    GenericAlias = None  # type: ignore[misc]
 
 try:
-    from typing import get_args, get_origin  # pytype: disable=import-error
+    from typing import get_args, get_origin  # type: ignore[attr-defined]
 except ImportError:
     # functions only available for 3.8 and up
-    def get_args(x):
-        return getattr(x, '__args__', ())
+    def get_args(tp: Any) -> Tuple[Any, ...]:
+        return getattr(tp, '__args__', ())
 
-    def get_origin(x):
-        return getattr(x, '__origin__', None)
+    def get_origin(tp: Any) -> Optional[Any]:
+        return getattr(tp, '__origin__', None)
 
 logger = getLogger(__name__)
 
@@ -171,7 +171,7 @@ _simples = {
 }
 
 
-def setting_type(py_type: Any) -> SettingType:  # pytype: disable=invalid-annotation
+def setting_type(py_type: Any) -> SettingType:
     """
     Parse a python type to a heksher setting type
     Args:

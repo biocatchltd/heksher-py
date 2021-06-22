@@ -1,5 +1,5 @@
 from enum import Enum, IntFlag, auto
-from typing import Sequence, Mapping
+from typing import Mapping, Sequence
 
 from pytest import raises
 

@@ -1,11 +1,11 @@
 import gc
-from weakref import ref
 from logging import WARNING
+from weakref import ref
 
 from pytest import raises
 
 import heksher.main_client
-from heksher.clients.stub import SyncStubHeksherClient, Rule
+from heksher.clients.stub import Rule, SyncStubHeksherClient
 from heksher.exceptions import NoMatchError
 from heksher.heksher_client import TemporaryClient
 from heksher.setting import Setting
