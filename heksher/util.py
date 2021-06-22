@@ -1,6 +1,5 @@
 from itertools import repeat
-
-from typing import Iterable, TypeVar, Callable, Tuple
+from typing import Callable, Iterable, Tuple, TypeVar
 
 T = TypeVar('T')
 T0 = TypeVar('T0')
@@ -30,8 +29,8 @@ def zip_supersequence(supersequence: Iterable[T0], subsequence: Iterable[T1],
         The elements match eagerly
 
     """
-    superseq_key = superseq_key or (lambda x: x)
-    subseq_key = subseq_key or (lambda x: x)
+    superseq_key_altered = superseq_key or (lambda x: x)  # type: ignore
+    subseq_key_altered = subseq_key or (lambda x: x)  # type: ignore
 
     sub_iter = iter(subsequence)
     super_iter = iter(supersequence)
@@ -40,17 +39,17 @@ def zip_supersequence(supersequence: Iterable[T0], subsequence: Iterable[T1],
     except StopIteration:
         pass
     else:
-        next_expected_sub_key = subseq_key(next_expected_sub)
+        next_expected_sub_key = subseq_key_altered(next_expected_sub)
 
         for super_element in super_iter:
-            super_key = superseq_key(super_element)
+            super_key = superseq_key_altered(super_element)
             if super_key == next_expected_sub_key:
                 yield super_element, next_expected_sub
                 try:
                     next_expected_sub = next(sub_iter)
                 except StopIteration:
                     break
-                next_expected_sub_key = subseq_key(next_expected_sub)
+                next_expected_sub_key = subseq_key_altered(next_expected_sub)
             else:
                 yield super_element, subseq_default
         else:

@@ -1,23 +1,19 @@
-from logging import getLogger
 from dataclasses import dataclass
-
+from logging import getLogger
 from operator import itemgetter
-from typing import Iterable, Tuple, Sequence, TypeVar, List, Any, Dict
+from typing import Any, Dict, Iterable, List, Sequence, Tuple, TypeVar
 
 import orjson
-from pydantic import BaseModel  # pytype: disable=import-error
+from pydantic import BaseModel
 
-from heksher.setting import RuleBranch, MISSING
+from heksher.setting import MISSING, RuleBranch
 from heksher.util import zip_supersequence
-
 
 logger = getLogger(__name__)
 T = TypeVar('T')
 
 
-# pytype: disable=invalid-annotation
 def collate_rules(keys: Sequence[str], rules: Iterable[Tuple[Sequence[Tuple[str, str]], T]]) -> RuleBranch[T]:
-    # pytype: enable=invalid-annotation
     """
     Gather a set of rules into a rule-branch root
     Args:
@@ -36,7 +32,7 @@ def collate_rules(keys: Sequence[str], rules: Iterable[Tuple[Sequence[Tuple[str,
             conds, ret = next(rule_iter)
         except StopIteration:
             # no rules at all
-            return MISSING
+            return MISSING  # type: ignore
         assert not conds
         # we assert that there is, at most, one rule
         try:
@@ -49,7 +45,7 @@ def collate_rules(keys: Sequence[str], rules: Iterable[Tuple[Sequence[Tuple[str,
                          stack_info=True)
         return ret
 
-    root = {}
+    root: Dict[str, Any] = {}
     for conditions, value in rules:
         # we constantly point the current node in the tree by storing its parent and the path to get there
         parent = None
@@ -82,7 +78,7 @@ def orjson_dumps(v, **kwargs):
     return str(orjson.dumps(v, **kwargs), 'utf-8')
 
 
-class SingleSettingData(BaseModel):  # pytype: disable=base-class-error
+class SingleSettingData(BaseModel):
     name: str
     configurable_features: List[str]
     type: str
@@ -99,7 +95,7 @@ class SingleSettingData(BaseModel):  # pytype: disable=base-class-error
             )
 
 
-class SettingsOutput(BaseModel):  # pytype: disable=base-class-error
+class SettingsOutput(BaseModel):
     settings: List[SingleSettingData]
 
     class Config:

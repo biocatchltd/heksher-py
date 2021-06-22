@@ -2,6 +2,8 @@
 ## unreleased
 ### Added
 * Added get_settings method to thread and async clients
+### Changed
+* Changed linters to mypy and isort
 ## 0.1.2
 #### Fixed
 * Removed redundant warning from `subclasses.py` when using `TRACK_ALL` feature.

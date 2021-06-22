@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Mapping, Collection
+from typing import Collection, Mapping
 from weakref import WeakSet
 
 import heksher.main_client

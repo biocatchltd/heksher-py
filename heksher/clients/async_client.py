@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-from asyncio import Task, Queue, Lock, Event, create_task, wait_for, TimeoutError, CancelledError
+from asyncio import CancelledError, Event, Lock, Queue, Task, TimeoutError, create_task, wait_for
 from contextvars import ContextVar
 from datetime import datetime
 from logging import getLogger
-from typing import Optional, NoReturn, Dict, Sequence, Any, TypeVar, Union, List
+from typing import Any, Dict, NoReturn, Optional, Sequence, TypeVar, Union
 
 import orjson
 from httpx import AsyncClient, HTTPError
 from ordered_set import OrderedSet
 
-from heksher.clients.subclasses import V1APIClient, ContextFeaturesMixin, AsyncContextManagerMixin
-from heksher.clients.util import SettingsOutput, SettingData
-from heksher.setting import Setting, MISSING
+from heksher.clients.subclasses import AsyncContextManagerMixin, ContextFeaturesMixin, V1APIClient
+from heksher.clients.util import SettingsOutput
+from heksher.setting import MISSING, Setting
 
 logger = getLogger(__name__)
 
@@ -80,13 +80,13 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
         while True:
             setting = await self._undeclared.get()
             try:
-                await declare_setting(setting)  # pytype: disable=name-error
+                await declare_setting(setting)
             except CancelledError:
                 # in 3.7, cancelled is a normal exception
                 raise
             except Exception:
                 logger.exception('setting declaration failed',
-                                 extra={'setting': setting.name})  # pytype: disable=name-error
+                                 extra={'setting': setting.name})
             finally:
                 self._undeclared.task_done()
 
@@ -194,7 +194,7 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
         response = await self._http_client.get('/api/health')
         response.raise_for_status()
 
-    async def get_settings(self) -> List[SettingData]:
+    async def get_settings(self) -> Dict:
         """
         List all the settings in the service
         """

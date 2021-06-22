@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import queue
-from contextvars import ContextVar
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from contextvars import ContextVar
 from logging import getLogger
-from typing import Dict, MutableMapping, Sequence, Iterable, Tuple, TypeVar, Union, Collection, Set, ContextManager, \
-    AsyncContextManager, Mapping
+from typing import (
+    AsyncContextManager, Collection, ContextManager, Dict, Iterable, Mapping, MutableMapping, Sequence, Set, Tuple,
+    TypeVar, Union
+)
 from weakref import WeakValueDictionary
 
 from httpx import Response
@@ -15,7 +17,7 @@ from ordered_set import OrderedSet
 
 from heksher.clients.util import collate_rules
 from heksher.heksher_client import BaseHeksherClient
-from heksher.setting import Setting, RuleBranch
+from heksher.setting import RuleBranch, Setting
 
 logger = getLogger(__name__)
 
@@ -41,9 +43,9 @@ class V1APIClient(BaseHeksherClient, ABC):
 
         self._tracked_context_options: Dict[str, Union[Set[str], str]] = defaultdict(set)
         # the tracked options can also include the sentinel value TRACK_ALL
+        # value will always be a set or TRACK_ALL, Literal is not supported in python 3.7
         self._tracked_settings: MutableMapping[str, Setting] = WeakValueDictionary()
 
-    # pytype: disable=invalid-annotation
     def collate_rules(self, rules: Iterable[Tuple[Sequence[Tuple[str, str]], T]]) -> RuleBranch[T]:
         """
         Collate a list of rules, according to the client's context features
@@ -55,7 +57,6 @@ class V1APIClient(BaseHeksherClient, ABC):
             The root rule branch
 
         """
-        # pytype: enable=invalid-annotation
         return collate_rules(self._context_features, rules)
 
     def add_settings(self, settings):
@@ -85,7 +86,7 @@ class V1APIClient(BaseHeksherClient, ABC):
                 v = (v,)
             if self._tracked_context_options[k] == TRACK_ALL:
                 raise RuntimeError("cannot track a specific value after the feature's been set to TRACK_ALL")
-            self._tracked_context_options[k].update(v)
+            self._tracked_context_options[k].update(v)  # type: ignore
 
     def _context_feature_options(self):
         return {k: (TRACK_ALL if v == TRACK_ALL else list(v))
@@ -194,7 +195,7 @@ class ContextManagerMixin(BaseHeksherClient, ContextManager):
     def close(self):
         pass
 
-    def __enter__(self: T) -> T:
+    def __enter__(self):
         self.set_as_main()
         return self
 
@@ -215,7 +216,7 @@ class AsyncContextManagerMixin(BaseHeksherClient, AsyncContextManager):
     async def close(self):
         pass
 
-    async def __aenter__(self: T) -> T:
+    async def __aenter__(self):
         await self.set_as_main()
         return self
 

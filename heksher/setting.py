@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from logging import getLogger
 from operator import attrgetter
+from typing import Any, Generic, Mapping, NamedTuple, Optional, Sequence, TypeVar, Union
 from weakref import ref
-from typing import Generic, TypeVar, Sequence, Optional, Mapping, Any, NamedTuple, Union
 
 from ordered_set import OrderedSet
 
@@ -23,7 +23,8 @@ class Setting(Generic[T]):
     A setting object, that stores a ruleset and can be updated by heksher clients
     """
 
-    def __init__(self, name: str, type, configurable_features: Sequence[str], default_value: T = MISSING,
+    def __init__(self, name: str, type, configurable_features: Sequence[str],
+                 default_value: T = MISSING,  # type: ignore
                  metadata: Optional[Mapping[str, Any]] = None):
         """
         Args:
@@ -45,7 +46,7 @@ class Setting(Generic[T]):
 
         self.last_ruleset: Optional[RuleSet] = None
 
-        heksher.main_client.Main.add_settings((self,))  # pytype: disable=pyi-error
+        heksher.main_client.Main.add_settings((self,))
 
     def get(self, **contexts) -> T:
         """
@@ -96,7 +97,7 @@ class Setting(Generic[T]):
         self.last_ruleset = RuleSet(ref(client), context_features, root)
 
 
-RuleBranch = Union[Mapping[Optional[str], 'RuleBranch[T]'], T]  # pytype: disable=not-supported-yet
+RuleBranch = Union[Mapping[Optional[str], 'RuleBranch[T]'], T]  # type: ignore[misc]
 """
 A RuleBranch is a nested collation of rules or sub-rules, stored in a uniform-depth tree structure.
 For example, the following set of rules:
@@ -136,7 +137,7 @@ class RuleMatch(NamedTuple):
     An internal structure for resolution, representing a value belonging to a rule that matched the
      current namespace
     """
-    value: T  # pytype: disable=not-supported-yet
+    value: T  # type: ignore[valid-type]
     """
     The value of the matched rule
     """
@@ -158,7 +159,7 @@ class RuleSet(NamedTuple):
     """
     The context features the root rulebranch was collated against
     """
-    root: RuleBranch[T]  # pytype: disable=not-supported-yet
+    root: RuleBranch[T]  # type: ignore[valid-type]
     """
     The root rulebranch
     """
@@ -195,6 +196,8 @@ class RuleSet(NamedTuple):
             if depth == len(self.context_features):
                 # leaf node
                 return RuleMatch(current, exact_match_depth)
+
+            assert isinstance(current, Mapping)
 
             feature = self.context_features[depth]
             if feature in setting.configurable_features:

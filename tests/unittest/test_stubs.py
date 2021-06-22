@@ -3,7 +3,7 @@ from typing import Mapping
 
 from pytest import mark, raises
 
-from heksher.clients.stub import SyncStubHeksherClient, Rule, AsyncStubHeksherClient
+from heksher.clients.stub import AsyncStubHeksherClient, Rule, SyncStubHeksherClient
 from heksher.setting import Setting
 
 atest = mark.asyncio

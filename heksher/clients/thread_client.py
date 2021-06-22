@@ -3,17 +3,17 @@ from __future__ import annotations
 from contextvars import ContextVar
 from datetime import datetime
 from logging import getLogger
-from queue import Queue, Empty
-from threading import Thread, Lock, Event
-from typing import Optional, Dict, Sequence, Any, TypeVar, Union, List
+from queue import Empty, Queue
+from threading import Event, Lock, Thread
+from typing import Any, Dict, Optional, Sequence, TypeVar, Union
 
 import orjson
 from httpx import Client, HTTPError
 from ordered_set import OrderedSet
 
-from heksher.clients.subclasses import V1APIClient, ContextFeaturesMixin, ContextManagerMixin
-from heksher.clients.util import SettingsOutput, SettingData
-from heksher.setting import Setting, MISSING
+from heksher.clients.subclasses import ContextFeaturesMixin, ContextManagerMixin, V1APIClient
+from heksher.clients.util import SettingsOutput
+from heksher.setting import MISSING, Setting
 
 logger = getLogger(__name__)
 
@@ -205,7 +205,7 @@ class ThreadHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin
         response = self._http_client().get('/api/health')
         response.raise_for_status()
 
-    def get_settings(self) -> List[SettingData]:
+    def get_settings(self) -> Dict:
         """
         List all the settings in the service
         """
