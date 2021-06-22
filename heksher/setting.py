@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from logging import getLogger
 from operator import attrgetter
-from typing import Any, Generic, Mapping, NamedTuple, Optional, Sequence, TypeVar, Union
+from typing import Any, Generic, Mapping, Optional, Sequence, TypeVar, Union
 from weakref import ref
 
 from ordered_set import OrderedSet
@@ -61,7 +62,7 @@ class Setting(Generic[T]):
         Raises:
             NoMatchError if no rules matched and a default value is not defined.
         """
-        redundant_keys = contexts.keys()-self.configurable_features
+        redundant_keys = contexts.keys() - self.configurable_features
         if redundant_keys:
             raise ValueError(f'the following keys are not configurable: {redundant_keys}')
 
@@ -132,12 +133,13 @@ Will be collated to the following rulebranch:
 """
 
 
-class RuleMatch(NamedTuple):
+@dataclass(frozen=True)
+class RuleMatch(Generic[T]):
     """
     An internal structure for resolution, representing a value belonging to a rule that matched the
      current namespace
     """
-    value: T  # type: ignore[valid-type]
+    value: T
     """
     The value of the matched rule
     """
@@ -147,7 +149,8 @@ class RuleMatch(NamedTuple):
     """
 
 
-class RuleSet(NamedTuple):
+@dataclass(frozen=True)
+class RuleSet(Generic[T]):
     """
     A complete set of rules, resolvable through a namespace
     """
@@ -159,7 +162,7 @@ class RuleSet(NamedTuple):
     """
     The context features the root rulebranch was collated against
     """
-    root: RuleBranch[T]  # type: ignore[valid-type]
+    root: RuleBranch[T]
     """
     The root rulebranch
     """
