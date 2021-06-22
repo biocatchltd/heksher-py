@@ -2,7 +2,7 @@
 ## unreleased
 ### Added
 * Added get_settings method to thread and async clients
-### Changed
+### Internal
 * Changed linters to mypy and isort
 ## 0.1.2
 #### Fixed
