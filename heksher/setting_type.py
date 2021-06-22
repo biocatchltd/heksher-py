@@ -12,10 +12,10 @@ import orjson
 try:
     from types import GenericAlias  # type: ignore[attr-defined]
 except ImportError:
-    GenericAlias = None
+    GenericAlias = None  # type: ignore[misc]
 
 try:
-    from typing import get_args, get_origin
+    from typing import get_args, get_origin  # type: ignore[attr-defined]
 except ImportError:
     # functions only available for 3.8 and up
     def get_args(tp: Any) -> Tuple[Any, ...]:

@@ -6,10 +6,10 @@ from typing import Collection, ContextManager, Generic, Mapping, Optional, TypeV
 from unittest.mock import MagicMock
 
 try:
-    from unittest.mock import AsyncMock
+    from unittest.mock import AsyncMock  # type: ignore[attr-defined]
 except ImportError:
     # asyncmock only available for python 3.8 and up, for earlier versions, we use the backport
-    from mock import AsyncMock
+    from mock import AsyncMock  # type: ignore[attr-defined]
 
 from heksher.clients.subclasses import AsyncContextManagerMixin, ContextFeaturesMixin, ContextManagerMixin
 from heksher.clients.util import collate_rules
