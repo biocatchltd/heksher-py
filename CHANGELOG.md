@@ -4,6 +4,9 @@
 * Added get_settings method to thread and async clients
 ### Internal
 * Changed linters to mypy and isort
+### Fixed
+* Added headers to httpx.AsyncClient, that supports content in body to be json
+* New HealthMonitor
 ## 0.1.2
 #### Fixed
 * Removed redundant warning from `subclasses.py` when using `TRACK_ALL` feature.
