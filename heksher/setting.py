@@ -43,7 +43,7 @@ class Setting(Generic[T]):
         self.type = setting_type(type)
         self.configurable_features = OrderedSet(configurable_features)
         self.default_value = default_value
-        self.metadata = metadata
+        self.metadata = metadata or {}
 
         self.last_ruleset: Optional[RuleSet] = None
 
