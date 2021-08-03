@@ -5,7 +5,7 @@
 ### Internal
 * Changed linters to mypy and isort
 ### Fixed
-* Added headers to httpx.AsyncClient, that supports content in body to be json
+* Added headers to httpx.AsyncClient and httpx.Client, that supports content in body to be json
 * Setting.metadata default value is now an empty dict
 ## 0.1.2
 #### Fixed
