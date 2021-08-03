@@ -18,6 +18,7 @@ from heksher.setting import MISSING, Setting
 logger = getLogger(__name__)
 
 T = TypeVar('T')
+content_header = {"Content-type": "application/json"}
 
 __all__ = ['ThreadHeksherClient']
 
@@ -89,7 +90,8 @@ class ThreadHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin
             }
             if setting.default_value is not MISSING:
                 declaration_data['default_value'] = setting.default_value
-            response = http_client.put('api/v1/settings/declare', data=orjson.dumps(declaration_data))
+            response = http_client.put('api/v1/settings/declare', content=orjson.dumps(declaration_data),
+                                       headers=content_header)
             self._handle_declaration_response(setting, response)
 
         while self._keep_going:
@@ -123,7 +125,8 @@ class ThreadHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin
                 data['cache_time'] = self._last_cache_time.isoformat()
             new_cache_time = datetime.utcnow()
 
-            response = http_client.post('/api/v1/rules/query', data=orjson.dumps(data))
+            response = http_client.post('/api/v1/rules/query', content=orjson.dumps(data),
+                                        headers=content_header)
             response.raise_for_status()
 
             updated_settings = response.json()['rules']
