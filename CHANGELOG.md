@@ -1,5 +1,5 @@
 # heksher Changelog
-## unreleased
+## 0.1.3
 ### Added
 * Added get_settings method to thread and async clients
 ### Internal
