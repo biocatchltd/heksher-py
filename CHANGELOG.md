@@ -1,4 +1,7 @@
 # heksher Changelog
+### 0.1.4
+### Changed
+* Changed httpx version limitation in poetry.toml to `*`
 ## 0.1.3
 ### Added
 * Added get_settings method to thread and async clients
