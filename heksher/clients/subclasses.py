@@ -15,8 +15,9 @@ from weakref import WeakValueDictionary
 from httpx import Response
 from ordered_set import OrderedSet
 
+import heksher.main_client
 from heksher.clients.util import collate_rules
-from heksher.heksher_client import BaseHeksherClient
+from heksher.heksher_client import BaseHeksherClient, TemporaryClient
 from heksher.setting import RuleBranch, Setting
 
 logger = getLogger(__name__)
@@ -141,6 +142,32 @@ class V1APIClient(BaseHeksherClient, ABC):
                 logger.warning('context feature value is not tracked by client',
                                extra={'context_feature': k, 'context_feature_value': v})
         return super().context_namespace(user_namespace)
+
+    def _set_as_main(self):
+        """
+        Transfer "main-ness" to self, either from a temporary client or another v1 client
+        """
+        previous_main: BaseHeksherClient = heksher.main_client.Main  # for readability of this function
+        if isinstance(previous_main, TemporaryClient):
+            self.add_settings(previous_main.undeclared)
+        elif isinstance(previous_main, V1APIClient):
+            logger.warning("switching main heksher clients! this is NOT recommended!")  # know when you've fucked up
+            if not previous_main._undeclared.empty():
+                raise RuntimeError("previous main heksher client still has unprocessed declarations, "
+                                   "did you forget to close it?")
+            if (self._context_features != previous_main._context_features):
+                # now you've really fucked up
+                raise RuntimeError("new main heksher client has different contexts")
+            # if we are using the same contexts, we can safely add the same settings to this client
+            self.add_settings([v for k, v in previous_main._tracked_settings.items()
+                               if k not in self._tracked_settings])
+            if (self._tracked_context_options != previous_main._tracked_context_options):
+                # this won't cause errors, but it will cause some settings to have the wrong values, be warned
+                logger.warning("new main heksher client tracks different context options")
+        else:
+            raise TypeError(f'cannot change main client from type '
+                            f'{type(previous_main).__name__} to type {type(self).__name__}')
+        heksher.main_client.Main = self
 
 
 class ContextFeaturesMixin(BaseHeksherClient, ABC):

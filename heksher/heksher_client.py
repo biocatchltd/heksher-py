@@ -31,19 +31,15 @@ class BaseHeksherClient(ABC):
         """
         pass
 
+    @abstractmethod
     def _set_as_main(self):
-        """
-        Internal method to transfer "main-ness" to self
-        """
-        if not isinstance(heksher.main_client.Main, TemporaryClient):
-            raise TypeError(f'cannot remove cliant of type {type(heksher.main_client.Main).__name__} from main')
-        self.add_settings(heksher.main_client.Main.undeclared)
-        heksher.main_client.Main = self
+        pass
 
 
 class TemporaryClient(BaseHeksherClient):
     """
     A temporary client, to hold undeclared settings until another client takes over.
+    Note: Should only be used internally until a real client is set as main.
     """
 
     def __init__(self):
@@ -54,6 +50,9 @@ class TemporaryClient(BaseHeksherClient):
 
     def context_namespace(self, user_namespace: Mapping[str, str]) -> Mapping[str, str]:
         return user_namespace
+
+    def _set_as_main(self):
+        raise RuntimeError("temporary client cannot be set as the main heksher client")
 
 
 heksher.main_client.Main = TemporaryClient()
