@@ -118,11 +118,8 @@ class Setting(Generic[T]):
                 value = validator(value, rule, self)
             return value
 
-        if context_features:
-            updated_rules = [(rule, validate(rule, value)) for (rule, value) in rules]
-            root = collate_rules(context_features, updated_rules)
-        else:
-            root = validate((), rules)  # type: ignore[arg-type]
+        updated_rules = [(rule, validate(rule, value)) for (rule, value) in rules]
+        root = collate_rules(context_features, updated_rules)
         self.last_ruleset = RuleSet(ref(client), context_features, root)
 
 

@@ -91,7 +91,7 @@ class StubClient(ContextFeaturesMixin):
             ]
             setting.update(self, first, rules)
         else:
-            setting.update(self, (), value)  # type: ignore
+            setting.update(self, (), [((), value)])  # type: ignore
 
         return ret
 
