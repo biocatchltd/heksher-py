@@ -1,16 +1,52 @@
 from dataclasses import dataclass
 from logging import getLogger
 from operator import itemgetter
-from typing import Any, Dict, Iterable, List, Sequence, Tuple, TypeVar
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, TypeVar, Union
 
 import orjson
 from pydantic import BaseModel
 
-from heksher.setting import MISSING, RuleBranch
 from heksher.util import zip_supersequence
 
 logger = getLogger(__name__)
 T = TypeVar('T')
+
+NO_DEFAULT = object()
+
+
+RuleBranch = Union[Mapping[Optional[str], 'RuleBranch[T]'], T]  # type: ignore[misc]
+"""
+A RuleBranch is a nested collation of rules or sub-rules, stored in a uniform-depth tree structure.
+For example, the following set of rules:
+{user: john} -> 100
+{user: jim, trust: admin} -> 200
+{user: jim} -> 50
+{trust: guest, theme: dark} -> 20
+{trust: guest} -> 10
+
+Will be collated to the following rulebranch:
+{
+  "john": {
+    None: {
+      None:100
+    }
+  },
+  "jim": {
+    "admin": {
+      None: 200
+    },
+    None: {
+      None: 50
+    }
+  },
+  None: {
+    "guest": {
+      "dark": 20,
+      None: 10
+    }
+  }
+}
+"""
 
 
 def collate_rules(keys: Sequence[str], rules: Iterable[Tuple[Sequence[Tuple[str, str]], T]]) -> RuleBranch[T]:
@@ -32,7 +68,7 @@ def collate_rules(keys: Sequence[str], rules: Iterable[Tuple[Sequence[Tuple[str,
             conds, ret = next(rule_iter)
         except StopIteration:
             # no rules at all
-            return MISSING  # type: ignore
+            return NO_DEFAULT  # type: ignore
         assert not conds
         # we assert that there is, at most, one rule
         try:
