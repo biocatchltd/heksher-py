@@ -1,5 +1,6 @@
 import gc
 from logging import WARNING
+from typing import Sequence
 from weakref import ref
 
 from pytest import raises
@@ -117,3 +118,45 @@ def test_useless_vals():
     a = Setting('a', int, 'abcx', default_value=-1)
     with raises(ValueError):
         a.get(a='', b='', c='', x='', d='')
+
+
+def test_setting_callback():
+    a = Setting('a', int, 'abcx', default_value=-1)
+
+    def setting_callback_1(setting: Setting, rule: Sequence[str], value: int) -> int:
+        if setting.name == 'a' and value == 10:
+            return 12
+
+    def setting_callback_2(setting: Setting, rule: Sequence[str], value: int) -> int:
+        if setting.name == 'a' and value == 12:
+            return 7
+
+    a.add_callback(setting_callback_1)
+    a.add_callback(setting_callback_2)
+    c1 = SyncStubHeksherClient()
+    c1.set_as_main()
+    c1.patch(a, 10)
+    assert a.get() == 7
+
+
+def test_setting_rules_collection_callback():
+    a = Setting('a', int, 'abcx', default_value=-1)
+
+    def setting_callback_1(setting: Setting, rule: Sequence[str], value: int) -> int:
+        if setting.name == 'a' and value == 0:
+            return 3
+
+    def setting_callback_2(setting: Setting, rule: Sequence[str], value: int) -> int:
+        if setting.name == 'a' and value == 3:
+            return 7
+
+    a.add_callback(setting_callback_1)
+    a.add_callback(setting_callback_2)
+    c1 = SyncStubHeksherClient()
+    c1.set_as_main()
+
+    c1.patch(a, [
+        Rule({'x': '0'}, 0)
+    ])
+    assert a.get(x='0') == 7
+    assert a.get(x='1') == -1

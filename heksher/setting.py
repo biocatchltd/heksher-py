@@ -3,20 +3,19 @@ from __future__ import annotations
 from dataclasses import dataclass
 from logging import getLogger
 from operator import attrgetter
-from typing import Any, Generic, Mapping, Optional, Sequence, TypeVar, Union
+from typing import Any, Callable, Generic, Iterable, List, Mapping, Optional, Sequence, Tuple, TypeVar, Union
 from weakref import ref
 
 from ordered_set import OrderedSet
 
 import heksher.main_client
+from heksher.clients.util import MISSING, RuleBranch, collate_rules
 from heksher.exceptions import NoMatchError
 from heksher.setting_type import setting_type
 
 logger = getLogger(__name__)
 
 T = TypeVar('T')
-
-MISSING = object()
 
 
 class Setting(Generic[T]):
@@ -47,7 +46,18 @@ class Setting(Generic[T]):
 
         self.last_ruleset: Optional[RuleSet] = None
 
+        self._callbacks: List[Callable[[Setting, Sequence[str], T], T]] = []
+
         heksher.main_client.Main.add_settings((self,))
+
+    def add_callback(self, callback: Callable[[Setting, Sequence[str], T], T]) -> None:
+        """
+        Gets callback to be added to the list of callback for this setting.
+        Args:
+            callback: the callback to be added.
+            A callback must have three arguments: Setting, rule and value.
+        """
+        self._callbacks.append(callback)
 
     def get(self, **contexts) -> T:
         """
@@ -81,56 +91,37 @@ class Setting(Generic[T]):
             return self.default_value
         return from_rules
 
-    def update(self, client, context_features: Sequence[str], root: RuleBranch[T]):
+    def update(self, client, context_features: Sequence[str], rules: Iterable[Tuple[Sequence[Tuple[str, str]], T]],
+               is_rule_collection: bool = True):
         """
         Update a setting's rules from a client
 
         Args:
             client: The client updating the setting.
             context_features: The context features the root was collated by.
-            root: A collated rulebranch root.
+            rules: An iterable of rules to collate.
+            is_rule_collection: bool, if rules are a collection; if not, don't collate the rules
         """
         if self.last_ruleset:
             last_client = self.last_ruleset.client()
             if last_client and last_client is not client:
                 logger.warning('setting received rule set from multiple clients',
                                extra={'setting': self.name, 'new_client': client, 'last_client': last_client})
+        if is_rule_collection:
+            updated_rules: List[Tuple[Sequence[Tuple[str, str]], T]] = []
+            for rule in rules:
+                rule_ = rule[0]
+                value_ = rule[1]
+                for callback in self._callbacks:
+                    value_ = callback(self, rule_, value_)  # type: ignore
+                updated_rules.append((rule_, value_))
+            root = collate_rules(context_features, updated_rules)
+        else:
+            root_ = rules
+            for callback in self._callbacks:
+                root_ = callback(self, '', root_)  # type: ignore
+            root = root_  # type: ignore
         self.last_ruleset = RuleSet(ref(client), context_features, root)
-
-
-RuleBranch = Union[Mapping[Optional[str], 'RuleBranch[T]'], T]  # type: ignore[misc]
-"""
-A RuleBranch is a nested collation of rules or sub-rules, stored in a uniform-depth tree structure.
-For example, the following set of rules:
-{user: john} -> 100
-{user: jim, trust: admin} -> 200
-{user: jim} -> 50
-{trust: guest, theme: dark} -> 20
-{trust: guest} -> 10
-
-Will be collated to the following rulebranch:
-{
-  "john": {
-    None: {
-      None:100
-    }
-  },
-  "jim": {
-    "admin": {
-      None: 200
-    },
-    None: {
-      None: 50
-    }
-  },
-  None: {
-    "guest": {
-      "dark": 20,
-      None: 10
-    }
-  }
-}
-"""
 
 
 @dataclass(frozen=True)

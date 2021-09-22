@@ -12,7 +12,6 @@ except ImportError:
     from mock import AsyncMock  # type: ignore[attr-defined]
 
 from heksher.clients.subclasses import AsyncContextManagerMixin, ContextFeaturesMixin, ContextManagerMixin
-from heksher.clients.util import collate_rules
 from heksher.setting import Setting
 
 T = TypeVar('T')
@@ -90,10 +89,9 @@ class StubClient(ContextFeaturesMixin):
                 ([(k, v) for k, v in rule.match_conditions.items() if v is not None], rule.value)
                 for rule in value
             ]
-            root = collate_rules(first, rules)
-            setting.update(self, first, root)
+            setting.update(self, first, rules)
         else:
-            setting.update(self, (), value)  # type: ignore
+            setting.update(self, (), value, is_rule_collection=False)  # type: ignore
 
         return ret
 

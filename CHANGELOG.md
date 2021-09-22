@@ -1,4 +1,8 @@
 # heksher Changelog
+### Next
+### Added
+* Added add_callback method for Setting; callbacks added to each Setting will be called by order they were added 
+  (each callback will receive value of previous callback); Callbacks will be called each time the Setting is updated
 ### 0.1.4
 ### Changed
 * Changed httpx version limitation in poetry.toml to `*`
