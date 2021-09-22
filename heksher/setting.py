@@ -9,7 +9,7 @@ from weakref import ref
 from ordered_set import OrderedSet
 
 import heksher.main_client
-from heksher.clients.util import MISSING, RuleBranch, collate_rules
+from heksher.clients.util import NO_DEFAULT, RuleBranch, collate_rules
 from heksher.exceptions import NoMatchError
 from heksher.setting_type import setting_type
 
@@ -24,7 +24,7 @@ class Setting(Generic[T]):
     """
 
     def __init__(self, name: str, type, configurable_features: Sequence[str],
-                 default_value: T = MISSING,  # type: ignore
+                 default_value: T = NO_DEFAULT,  # type: ignore
                  metadata: Optional[Mapping[str, Any]] = None):
         """
         Args:
@@ -46,18 +46,25 @@ class Setting(Generic[T]):
 
         self.last_ruleset: Optional[RuleSet] = None
 
-        self._callbacks: List[Callable[[Setting, Sequence[str], T], T]] = []
+        self._validators: List[Callable[[T, Sequence[Tuple[str, str]], Setting], T]] = []
 
         heksher.main_client.Main.add_settings((self,))
 
-    def add_callback(self, callback: Callable[[Setting, Sequence[str], T], T]) -> None:
+    def add_validator(self, validator: Callable[[T, Sequence[Tuple[str, str]], Setting], T]) \
+            -> Callable[[T, Sequence[Tuple[str, str]], Setting], T]:
         """
-        Gets callback to be added to the list of callback for this setting.
+        Add a validator to be called when the setting's value is updated.
+        If multiple callbacks are added, they are called in the order they are added.
         Args:
-            callback: the callback to be added.
-            A callback must have three arguments: Setting, rule and value.
+            validator: the validator to be added.
+            A validator must have three positional arguments: value, rule and Setting.
+            The return value of the validator will be the new value of the rule.
+
+        Returns:
+            The validator given, so the method can be used as a decorator
         """
-        self._callbacks.append(callback)
+        self._validators.append(validator)
+        return validator
 
     def get(self, **contexts) -> T:
         """
@@ -80,19 +87,18 @@ class Setting(Generic[T]):
             try:
                 from_rules = self.last_ruleset.resolve(contexts, self)
             except NoMatchError:
-                from_rules = MISSING
+                from_rules = NO_DEFAULT
         else:
             logger.warning('the value of setting was never retrieved from service', extra={'setting': self.name})
-            from_rules = MISSING
+            from_rules = NO_DEFAULT
 
-        if from_rules is MISSING:
-            if self.default_value is MISSING:
+        if from_rules is NO_DEFAULT:
+            if self.default_value is NO_DEFAULT:
                 raise NoMatchError(self.name)
             return self.default_value
         return from_rules
 
-    def update(self, client, context_features: Sequence[str], rules: Iterable[Tuple[Sequence[Tuple[str, str]], T]],
-               is_rule_collection: bool = True):
+    def update(self, client, context_features: Sequence[str], rules: Iterable[Tuple[Sequence[Tuple[str, str]], T]]):
         """
         Update a setting's rules from a client
 
@@ -100,27 +106,23 @@ class Setting(Generic[T]):
             client: The client updating the setting.
             context_features: The context features the root was collated by.
             rules: An iterable of rules to collate.
-            is_rule_collection: bool, if rules are a collection; if not, don't collate the rules
         """
         if self.last_ruleset:
             last_client = self.last_ruleset.client()
             if last_client and last_client is not client:
                 logger.warning('setting received rule set from multiple clients',
                                extra={'setting': self.name, 'new_client': client, 'last_client': last_client})
-        if is_rule_collection:
-            updated_rules: List[Tuple[Sequence[Tuple[str, str]], T]] = []
-            for rule in rules:
-                rule_ = rule[0]
-                value_ = rule[1]
-                for callback in self._callbacks:
-                    value_ = callback(self, rule_, value_)  # type: ignore
-                updated_rules.append((rule_, value_))
+
+        def validate(rule: Sequence[Tuple[str, str]], value: T) -> T:
+            for validator in self._validators:
+                value = validator(value, rule, self)
+            return value
+
+        if context_features:
+            updated_rules = [(rule, validate(rule, value)) for (rule, value) in rules]
             root = collate_rules(context_features, updated_rules)
         else:
-            root_ = rules
-            for callback in self._callbacks:
-                root_ = callback(self, '', root_)  # type: ignore
-            root = root_  # type: ignore
+            root = validate((), rules)  # type: ignore[arg-type]
         self.last_ruleset = RuleSet(ref(client), context_features, root)
 
 

@@ -1,8 +1,8 @@
 # heksher Changelog
 ### Next
 ### Added
-* Added add_callback method for Setting; callbacks added to each Setting will be called by order they were added 
-  (each callback will receive value of previous callback); Callbacks will be called each time the Setting is updated
+* Added add_validator method for Setting; Validators added to each Setting will be called by order they were added 
+  (each validator will receive value of previous validator); Validators will be called each time the Setting is updated
 ### 0.1.4
 ### Changed
 * Changed httpx version limitation in poetry.toml to `*`

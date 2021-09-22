@@ -11,7 +11,7 @@ from heksher.util import zip_supersequence
 logger = getLogger(__name__)
 T = TypeVar('T')
 
-MISSING = object()
+NO_DEFAULT = object()
 
 
 RuleBranch = Union[Mapping[Optional[str], 'RuleBranch[T]'], T]  # type: ignore[misc]
@@ -68,7 +68,7 @@ def collate_rules(keys: Sequence[str], rules: Iterable[Tuple[Sequence[Tuple[str,
             conds, ret = next(rule_iter)
         except StopIteration:
             # no rules at all
-            return MISSING  # type: ignore
+            return NO_DEFAULT  # type: ignore
         assert not conds
         # we assert that there is, at most, one rule
         try:
