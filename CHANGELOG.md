@@ -1,5 +1,8 @@
 # heksher Changelog
-### 0.1.4
+## Next
+### Changed
+* Changing main client between similar clients that track the same contexts is now possible, but not recommended. Changed for testing purposes.
+## 0.1.4
 ### Changed
 * Changed httpx version limitation in poetry.toml to `*`
 ## 0.1.3
