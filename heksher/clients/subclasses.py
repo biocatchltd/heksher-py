@@ -60,7 +60,7 @@ class V1APIClient(BaseHeksherClient, ABC):
         """
         return collate_rules(self._context_features, rules)
 
-    def add_settings(self, settings):
+    def add_settings(self, settings: Iterable[Setting]):
         for s in settings:
             self._undeclared.put_nowait(s)
 
@@ -151,19 +151,26 @@ class V1APIClient(BaseHeksherClient, ABC):
         if isinstance(previous_main, TemporaryClient):
             self.add_settings(previous_main.undeclared)
         elif isinstance(previous_main, V1APIClient):
-            logger.warning("switching main heksher clients! this is NOT recommended!")  # know when you've fucked up
+            # know when you've fucked up
+            logger.warning("switching main heksher clients! this is NOT recommended! (unless this is a test)")
             if not previous_main._undeclared.empty():
                 raise RuntimeError("previous main heksher client still has unprocessed declarations, "
                                    "did you forget to close it?")
-            if (self._context_features != previous_main._context_features):
+            if self._context_features != previous_main._context_features:
                 # now you've really fucked up
-                raise RuntimeError("new main heksher client has different contexts")
+                raise RuntimeError(f"new main heksher client has different contexts, "
+                                   f"previous: {previous_main._context_features}, new: {self._context_features}")
             # if we are using the same contexts, we can safely add the same settings to this client
-            self.add_settings([v for k, v in previous_main._tracked_settings.items()
-                               if k not in self._tracked_settings])
-            if (self._tracked_context_options != previous_main._tracked_context_options):
+            # no need to redeclare them, so we just track them
+            for setting_name, setting in previous_main._tracked_settings.items():
+                if setting_name in self._tracked_settings:
+                    continue
+                self._tracked_settings[setting.name] = setting
+            if self._tracked_context_options != previous_main._tracked_context_options:
                 # this won't cause errors, but it will cause some settings to have the wrong values, be warned
-                logger.warning("new main heksher client tracks different context options")
+                logger.warning("new main heksher client tracks different context options",
+                               extra={"previous_options": previous_main._tracked_context_options,
+                                      "new_options": self._tracked_context_options})
         else:
             raise TypeError(f'cannot change main client from type '
                             f'{type(previous_main).__name__} to type {type(self).__name__}')

@@ -33,6 +33,9 @@ class BaseHeksherClient(ABC):
 
     @abstractmethod
     def _set_as_main(self):
+        """
+        Internal method to transfer "main-ness" to self
+        """
         pass
 
 
