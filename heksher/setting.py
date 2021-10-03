@@ -3,20 +3,19 @@ from __future__ import annotations
 from dataclasses import dataclass
 from logging import getLogger
 from operator import attrgetter
-from typing import Any, Generic, Mapping, Optional, Sequence, TypeVar, Union
+from typing import Any, Callable, Generic, Iterable, List, Mapping, Optional, Sequence, Tuple, TypeVar, Union
 from weakref import ref
 
 from ordered_set import OrderedSet
 
 import heksher.main_client
+from heksher.clients.util import NO_DEFAULT, RuleBranch, collate_rules
 from heksher.exceptions import NoMatchError
 from heksher.setting_type import setting_type
 
 logger = getLogger(__name__)
 
 T = TypeVar('T')
-
-MISSING = object()
 
 
 class Setting(Generic[T]):
@@ -25,7 +24,7 @@ class Setting(Generic[T]):
     """
 
     def __init__(self, name: str, type, configurable_features: Sequence[str],
-                 default_value: T = MISSING,  # type: ignore
+                 default_value: T = NO_DEFAULT,  # type: ignore
                  metadata: Optional[Mapping[str, Any]] = None):
         """
         Args:
@@ -47,7 +46,25 @@ class Setting(Generic[T]):
 
         self.last_ruleset: Optional[RuleSet] = None
 
+        self._validators: List[Callable[[T, Sequence[Tuple[str, str]], Setting], T]] = []
+
         heksher.main_client.Main.add_settings((self,))
+
+    def add_validator(self, validator: Callable[[T, Sequence[Tuple[str, str]], Setting], T]) \
+            -> Callable[[T, Sequence[Tuple[str, str]], Setting], T]:
+        """
+        Add a validator to be called when the setting's value is updated.
+        If multiple callbacks are added, they are called in the order they are added.
+        Args:
+            validator: the validator to be added.
+            A validator must have three positional arguments: value, rule and Setting.
+            The return value of the validator will be the new value of the rule.
+
+        Returns:
+            The validator given, so the method can be used as a decorator
+        """
+        self._validators.append(validator)
+        return validator
 
     def get(self, **contexts) -> T:
         """
@@ -70,67 +87,40 @@ class Setting(Generic[T]):
             try:
                 from_rules = self.last_ruleset.resolve(contexts, self)
             except NoMatchError:
-                from_rules = MISSING
+                from_rules = NO_DEFAULT
         else:
             logger.warning('the value of setting was never retrieved from service', extra={'setting': self.name})
-            from_rules = MISSING
+            from_rules = NO_DEFAULT
 
-        if from_rules is MISSING:
-            if self.default_value is MISSING:
+        if from_rules is NO_DEFAULT:
+            if self.default_value is NO_DEFAULT:
                 raise NoMatchError(self.name)
             return self.default_value
         return from_rules
 
-    def update(self, client, context_features: Sequence[str], root: RuleBranch[T]):
+    def update(self, client, context_features: Sequence[str], rules: Iterable[Tuple[Sequence[Tuple[str, str]], T]]):
         """
         Update a setting's rules from a client
 
         Args:
             client: The client updating the setting.
             context_features: The context features the root was collated by.
-            root: A collated rulebranch root.
+            rules: An iterable of rules to collate.
         """
         if self.last_ruleset:
             last_client = self.last_ruleset.client()
             if last_client and last_client is not client:
                 logger.warning('setting received rule set from multiple clients',
                                extra={'setting': self.name, 'new_client': client, 'last_client': last_client})
+
+        def validate(rule: Sequence[Tuple[str, str]], value: T) -> T:
+            for validator in self._validators:
+                value = validator(value, rule, self)
+            return value
+
+        updated_rules = [(rule, validate(rule, value)) for (rule, value) in rules]
+        root = collate_rules(context_features, updated_rules)
         self.last_ruleset = RuleSet(ref(client), context_features, root)
-
-
-RuleBranch = Union[Mapping[Optional[str], 'RuleBranch[T]'], T]  # type: ignore[misc]
-"""
-A RuleBranch is a nested collation of rules or sub-rules, stored in a uniform-depth tree structure.
-For example, the following set of rules:
-{user: john} -> 100
-{user: jim, trust: admin} -> 200
-{user: jim} -> 50
-{trust: guest, theme: dark} -> 20
-{trust: guest} -> 10
-
-Will be collated to the following rulebranch:
-{
-  "john": {
-    None: {
-      None:100
-    }
-  },
-  "jim": {
-    "admin": {
-      None: 200
-    },
-    None: {
-      None: 50
-    }
-  },
-  None: {
-    "guest": {
-      "dark": 20,
-      None: 10
-    }
-  }
-}
-"""
 
 
 @dataclass(frozen=True)

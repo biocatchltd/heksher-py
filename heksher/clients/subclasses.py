@@ -123,8 +123,7 @@ class V1APIClient(BaseHeksherClient, ABC):
         for setting_name, rule_mappings in updated_settings.items():
             setting = self._tracked_settings[setting_name]
             rules = ((rm['context_features'], setting.type.convert(rm['value'])) for rm in rule_mappings)
-            branch = self.collate_rules(rules)
-            setting.update(self, self._context_features, branch)
+            setting.update(self, self._context_features, rules)
 
     def context_namespace(self, user_namespace: Mapping[str, str]) -> Mapping[str, str]:
         redundant_keys = user_namespace.keys() - self._context_features

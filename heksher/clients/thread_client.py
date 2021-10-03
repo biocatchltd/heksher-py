@@ -13,7 +13,7 @@ from ordered_set import OrderedSet
 
 from heksher.clients.subclasses import ContextFeaturesMixin, ContextManagerMixin, V1APIClient
 from heksher.clients.util import SettingsOutput
-from heksher.setting import MISSING, Setting
+from heksher.setting import NO_DEFAULT, Setting
 
 logger = getLogger(__name__)
 
@@ -88,7 +88,7 @@ class ThreadHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin
                 'type': setting.type.heksher_string(),
                 'metadata': setting.metadata,
             }
-            if setting.default_value is not MISSING:
+            if setting.default_value is not NO_DEFAULT:
                 declaration_data['default_value'] = setting.default_value
             response = http_client.put('api/v1/settings/declare', content=orjson.dumps(declaration_data),
                                        headers=content_header)
