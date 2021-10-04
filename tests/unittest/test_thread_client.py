@@ -201,3 +201,204 @@ def test_get_settings(fake_heksher_service, monkeypatch):
                                                default_value=None,
                                                metadata={})
                             }
+
+
+def test_switch_main_from_temp(fake_heksher_service, monkeypatch):
+    monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b'])
+    monkeypatch.setitem(fake_heksher_service.declare_responses, 'conf1', {
+        'created': True, 'changed': [], 'incomplete': {}
+    })
+    monkeypatch.setitem(fake_heksher_service.declare_responses, 'conf2', {
+        'created': True, 'changed': [], 'incomplete': {}
+    })
+    setting1 = Setting('conf1', int, ['a'], 74)
+    client = ThreadHeksherClient(fake_heksher_service.url, 10000000, ['a', 'b'])
+    client.track_contexts(a=['a', 'b'], b=TRACK_ALL)
+    client.set_as_main()
+    setting2 = Setting('conf2', int, ['b'], 26)
+    monkeypatch.setattr(fake_heksher_service, 'query_response', {
+        'rules': {
+            'conf1': [
+                {'context_features': [], 'value': 5}
+            ],
+            'conf2': [
+                {'context_features': [], 'value': 4}
+            ]
+        }
+    })
+    client.reload()
+    assert setting1.get(a='') == 5
+    assert setting2.get(b='') == 4
+    client.close()
+
+
+def test_switch_main(fake_heksher_service, monkeypatch, caplog):
+    monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b'])
+    monkeypatch.setitem(fake_heksher_service.declare_responses, 'conf1', {
+        'created': True, 'changed': [], 'incomplete': {}
+    })
+    monkeypatch.setitem(fake_heksher_service.declare_responses, 'conf2', {
+        'created': True, 'changed': [], 'incomplete': {}
+    })
+    monkeypatch.setitem(fake_heksher_service.declare_responses, 'conf3', {
+        'created': True, 'changed': [], 'incomplete': {}
+    })
+    setting1 = Setting('conf1', int, ['a'], 74)
+    client1 = ThreadHeksherClient(fake_heksher_service.url, 10000000, ['a', 'b'])
+    client1.track_contexts(a=['a', 'b'], b=TRACK_ALL)
+    client1.set_as_main()
+    setting2 = Setting('conf2', int, ['b'], 26)
+    monkeypatch.setattr(fake_heksher_service, 'query_response', {
+        'rules': {
+            'conf1': [
+                {'context_features': [], 'value': 5}
+            ],
+            'conf2': [
+                {'context_features': [], 'value': 4}
+            ]
+        }
+    })
+    client1.reload()
+    assert len(client1._tracked_settings) == 2
+    assert setting1.get(a='') == 5
+    assert setting2.get(b='') == 4
+    client2 = ThreadHeksherClient(fake_heksher_service.url, 10000000, ['a', 'b'])
+    client2.track_contexts(a=['a', 'b'], b=TRACK_ALL)
+    client1.close()
+    with assert_logs(caplog, WARNING):  # it should warn you you're doing bad things
+        client2.set_as_main()
+    setting3 = Setting('conf3', int, ['b'], 59)
+    monkeypatch.setattr(fake_heksher_service, 'query_response', {
+        'rules': {
+            'conf1': [
+                {'context_features': [], 'value': 5}
+            ],
+            'conf2': [
+                {'context_features': [], 'value': 4}
+            ],
+            'conf3': [
+                {'context_features': [], 'value': 3}
+            ]
+        }
+    })
+    client2.reload()
+    assert setting1.get(a='') == 5
+    assert setting2.get(b='') == 4
+    assert setting3.get(b='') == 3
+    client2.close()
+
+
+def test_switch_main_different_tracking(fake_heksher_service, monkeypatch, caplog):
+    monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b'])
+    monkeypatch.setitem(fake_heksher_service.declare_responses, 'conf1', {
+        'created': True, 'changed': [], 'incomplete': {}
+    })
+    monkeypatch.setitem(fake_heksher_service.declare_responses, 'conf2', {
+        'created': True, 'changed': [], 'incomplete': {}
+    })
+    monkeypatch.setitem(fake_heksher_service.declare_responses, 'conf3', {
+        'created': True, 'changed': [], 'incomplete': {}
+    })
+    setting1 = Setting('conf1', int, ['a'], 74)
+    client1 = ThreadHeksherClient(fake_heksher_service.url, 10000000, ['a', 'b'])
+    client1.track_contexts(a=['a', 'b'], b=TRACK_ALL)
+    client1.set_as_main()
+    setting2 = Setting('conf2', int, ['b'], 26)
+    monkeypatch.setattr(fake_heksher_service, 'query_response', {
+        'rules': {
+            'conf1': [
+                {'context_features': [], 'value': 5}
+            ],
+            'conf2': [
+                {'context_features': [], 'value': 4}
+            ]
+        }
+    })
+    client1.reload()
+    assert len(client1._tracked_settings) == 2
+    assert setting1.get(a='') == 5
+    assert setting2.get(b='') == 4
+    client2 = ThreadHeksherClient(fake_heksher_service.url, 10000000, ['a', 'b'])
+    client2.track_contexts(a=['a', 'b', 'c'], b="shoobidoobi")
+    client1.close()
+    with assert_logs(caplog, WARNING):  # it should warn you you're doing bad things, and that your tracking differs
+        client2.set_as_main()
+    setting3 = Setting('conf3', int, ['b'], 59)
+    monkeypatch.setattr(fake_heksher_service, 'query_response', {
+        'rules': {
+            'conf1': [
+                {'context_features': [], 'value': 5}
+            ],
+            'conf2': [
+                {'context_features': [], 'value': 4}
+            ],
+            'conf3': [
+                {'context_features': [], 'value': 3}
+            ]
+        }
+    })
+    client2.reload()
+    assert setting1.get(a='') == 5
+    assert setting2.get(b='') == 4
+    assert setting3.get(b='') == 3
+    client2.close()
+
+
+def test_switch_main_different_contexts(fake_heksher_service, monkeypatch):
+    monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b', 'c'])
+    monkeypatch.setitem(fake_heksher_service.declare_responses, 'conf1', {
+        'created': True, 'changed': [], 'incomplete': {}
+    })
+    monkeypatch.setitem(fake_heksher_service.declare_responses, 'conf2', {
+        'created': True, 'changed': [], 'incomplete': {}
+    })
+    monkeypatch.setitem(fake_heksher_service.declare_responses, 'conf3', {
+        'created': True, 'changed': [], 'incomplete': {}
+    })
+    setting1 = Setting('conf1', int, ['a'], 74)
+    client1 = ThreadHeksherClient(fake_heksher_service.url, 10000000, ['a', 'b'])
+    client1.track_contexts(a=['a', 'b'], b=TRACK_ALL)
+    client1.set_as_main()
+    setting2 = Setting('conf2', int, ['b'], 26)
+    monkeypatch.setattr(fake_heksher_service, 'query_response', {
+        'rules': {
+            'conf1': [
+                {'context_features': [], 'value': 5}
+            ],
+            'conf2': [
+                {'context_features': [], 'value': 4}
+            ]
+        }
+    })
+    client1.reload()
+    assert len(client1._tracked_settings) == 2
+    assert setting1.get(a='') == 5
+    assert setting2.get(b='') == 4
+    client2 = ThreadHeksherClient(fake_heksher_service.url, 10000000, ['b', 'c'])
+    client2.track_contexts(a=['a', 'b'], b=TRACK_ALL)
+    client1.close()
+    with raises(RuntimeError):  # not allowed
+        client2.set_as_main()
+
+
+def test_switch_main_unclosed(fake_heksher_service, monkeypatch):
+    monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b'])
+    monkeypatch.setitem(fake_heksher_service.declare_responses, 'conf1', {
+        'created': True, 'changed': [], 'incomplete': {}
+    })
+    monkeypatch.setitem(fake_heksher_service.declare_responses, 'conf2', {
+        'created': True, 'changed': [], 'incomplete': {}
+    })
+    monkeypatch.setitem(fake_heksher_service.declare_responses, 'conf3', {
+        'created': True, 'changed': [], 'incomplete': {}
+    })
+    setting1 = Setting('conf1', int, ['a'], 74)
+    client1 = ThreadHeksherClient(fake_heksher_service.url, 10000000, ['a', 'b'])
+    client1.track_contexts(a=['a', 'b'], b=TRACK_ALL)
+    client1.set_as_main()
+    client1.close()
+    setting2 = Setting('conf2', int, ['b'], 26)
+    client2 = ThreadHeksherClient(fake_heksher_service.url, 10000000, ['a', 'b'])
+    client2.track_contexts(a=['a', 'b'], b=TRACK_ALL)
+    with raises(RuntimeError):  # not allowed
+        client2.set_as_main()

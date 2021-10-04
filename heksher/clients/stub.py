@@ -11,6 +11,7 @@ except ImportError:
     # asyncmock only available for python 3.8 and up, for earlier versions, we use the backport
     from mock import AsyncMock  # type: ignore[attr-defined]
 
+import heksher.main_client
 from heksher.clients.subclasses import AsyncContextManagerMixin, ContextFeaturesMixin, ContextManagerMixin
 from heksher.setting import Setting
 
@@ -94,6 +95,9 @@ class StubClient(ContextFeaturesMixin):
             setting.update(self, (), [((), value)])  # type: ignore
 
         return ret
+
+    def _set_as_main(self):
+        heksher.main_client.Main = self
 
 
 class AsyncStubHeksherClient(StubClient, AsyncContextManagerMixin):
