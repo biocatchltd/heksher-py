@@ -229,6 +229,7 @@ def test_switch_main_from_temp(fake_heksher_service, monkeypatch):
     client.reload()
     assert setting1.get(a='') == 5
     assert setting2.get(b='') == 4
+    client.close()
 
 
 def test_switch_main(fake_heksher_service, monkeypatch, caplog):
@@ -284,6 +285,7 @@ def test_switch_main(fake_heksher_service, monkeypatch, caplog):
     assert setting1.get(a='') == 5
     assert setting2.get(b='') == 4
     assert setting3.get(b='') == 3
+    client2.close()
 
 
 def test_switch_main_different_tracking(fake_heksher_service, monkeypatch, caplog):
@@ -339,6 +341,7 @@ def test_switch_main_different_tracking(fake_heksher_service, monkeypatch, caplo
     assert setting1.get(a='') == 5
     assert setting2.get(b='') == 4
     assert setting3.get(b='') == 3
+    client2.close()
 
 
 def test_switch_main_different_contexts(fake_heksher_service, monkeypatch):
@@ -376,6 +379,7 @@ def test_switch_main_different_contexts(fake_heksher_service, monkeypatch):
     client1.close()
     with raises(RuntimeError):  # not allowed
         client2.set_as_main()
+    client2.close()
 
 
 def test_switch_main_unclosed(fake_heksher_service, monkeypatch):
@@ -399,3 +403,4 @@ def test_switch_main_unclosed(fake_heksher_service, monkeypatch):
     client2.track_contexts(a=['a', 'b'], b=TRACK_ALL)
     with raises(RuntimeError):  # not allowed
         client2.set_as_main()
+    client2.close()
