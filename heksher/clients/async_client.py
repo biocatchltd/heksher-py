@@ -176,8 +176,18 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
         await super().close()
         if self._update_task:
             self._update_task.cancel()
+            try:
+                await wait_for(self._update_task, 0.01)
+            except CancelledError:
+                pass
+            self._update_task = None
         if self._declaration_task:
             self._declaration_task.cancel()
+            try:
+                await wait_for(self._declaration_task, 0.01)
+            except CancelledError:
+                pass
+            self._declaration_task = None
         await self._http_client.aclose()
 
     def set_defaults(self, **kwargs: Union[str, ContextVar[str]]):
