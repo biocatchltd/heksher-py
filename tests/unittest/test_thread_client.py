@@ -379,7 +379,6 @@ def test_switch_main_different_contexts(fake_heksher_service, monkeypatch):
     client1.close()
     with raises(RuntimeError):  # not allowed
         client2.set_as_main()
-    client2.close()
 
 
 def test_switch_main_unclosed(fake_heksher_service, monkeypatch):
@@ -403,4 +402,3 @@ def test_switch_main_unclosed(fake_heksher_service, monkeypatch):
     client2.track_contexts(a=['a', 'b'], b=TRACK_ALL)
     with raises(RuntimeError):  # not allowed
         client2.set_as_main()
-    client2.close()
