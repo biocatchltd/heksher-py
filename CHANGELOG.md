@@ -1,5 +1,5 @@
 # heksher Changelog
-### Next
+### 0.1.5
 ### Added
 * Added add_validator method for Setting; Validators added to each Setting will be called by order they were added 
   (each validator will receive value of previous validator); Validators will be called each time the Setting is updated
