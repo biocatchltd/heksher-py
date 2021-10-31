@@ -82,15 +82,8 @@ class ThreadHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin
         http_client = self._http_client()
 
         def declare_setting(setting):
-            declaration_data = {
-                'name': setting.name,
-                'configurable_features': list(setting.configurable_features),
-                'type': setting.type.heksher_string(),
-                'metadata': setting.metadata,
-            }
-            if setting.default_value is not NO_DEFAULT:
-                declaration_data['default_value'] = setting.default_value
-            response = http_client.put('api/v1/settings/declare', content=orjson.dumps(declaration_data),
+            response = http_client.put('api/v1/settings/declare',
+                                       content=orjson.dumps(setting.to_declaration_request()),
                                        headers=content_header)
             self._handle_declaration_response(setting, response)
 
