@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from logging import getLogger
 from operator import attrgetter
-from typing import Any, Callable, Generic, Iterable, List, Mapping, Optional, Sequence, Tuple, TypeVar, Union
+from typing import Any, Callable, Dict, Generic, Iterable, List, Mapping, Optional, Sequence, Tuple, TypeVar, Union
 from weakref import ref
 
 from ordered_set import OrderedSet
@@ -25,7 +25,8 @@ class Setting(Generic[T]):
 
     def __init__(self, name: str, type, configurable_features: Sequence[str],
                  default_value: T = NO_DEFAULT,  # type: ignore
-                 metadata: Optional[Mapping[str, Any]] = None):
+                 metadata: Optional[Mapping[str, Any]] = None,
+                 alias: Optional[str] = None):
         """
         Args:
             name: The name of the setting.
@@ -43,6 +44,7 @@ class Setting(Generic[T]):
         self.configurable_features = OrderedSet(configurable_features)
         self.default_value = default_value
         self.metadata = metadata or {}
+        self.alias = alias
 
         self.last_ruleset: Optional[RuleSet] = None
 
@@ -121,6 +123,21 @@ class Setting(Generic[T]):
         updated_rules = [(rule, validate(rule, value)) for (rule, value) in rules]
         root = collate_rules(context_features, updated_rules)
         self.last_ruleset = RuleSet(ref(client), context_features, root)
+
+    def to_v1_declaration_body(self) -> Dict[str, Any]:
+        """
+        Creates the request body for v1 declaration of this setting
+        """
+        declaration_data: Dict[str, Any] = {
+            'name': self.name,
+            'configurable_features': list(self.configurable_features),
+            'type': self.type.heksher_string(),
+            'metadata': self.metadata,
+            'alias': self.alias,
+        }
+        if self.default_value is not NO_DEFAULT:
+            declaration_data['default_value'] = self.default_value
+        return declaration_data
 
 
 @dataclass(frozen=True)
