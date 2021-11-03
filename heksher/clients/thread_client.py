@@ -13,7 +13,7 @@ from ordered_set import OrderedSet
 
 from heksher.clients.subclasses import ContextFeaturesMixin, ContextManagerMixin, V1APIClient
 from heksher.clients.util import SettingsOutput
-from heksher.setting import NO_DEFAULT, Setting
+from heksher.setting import Setting
 
 logger = getLogger(__name__)
 
@@ -83,7 +83,7 @@ class ThreadHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin
 
         def declare_setting(setting):
             response = http_client.put('api/v1/settings/declare',
-                                       content=orjson.dumps(setting.to_declaration_request()),
+                                       content=orjson.dumps(setting.to_v1_declaration_body()),
                                        headers=content_header)
             self._handle_declaration_response(setting, response)
 

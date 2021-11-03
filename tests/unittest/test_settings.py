@@ -167,12 +167,12 @@ def test_setting_rules_collection_callback():
 
 
 def test_v1_body():
-    a = Setting('a', int, 'abcx', default_value=-1, metadata={"some": "thing"}, alias='aa')
+    a = Setting('aaa', int, 'abcx', default_value=-1, metadata={"some": "thing"}, alias='aaaa')
     assert a.to_v1_declaration_body() == {
-        'name': 'a',
+        'name': 'aaa',
         'configurable_features': list('abcx'),
         'type': 'int',
         'metadata': {"some": "thing"},
-        'alias': 'aa',
+        'alias': 'aaaa',
         'default_value': -1,
     }

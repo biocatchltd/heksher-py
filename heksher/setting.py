@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from logging import getLogger
 from operator import attrgetter
-from typing import Any, Callable, Generic, Iterable, List, Mapping, Optional, Sequence, Tuple, TypeVar, Union
+from typing import Any, Callable, Dict, Generic, Iterable, List, Mapping, Optional, Sequence, Tuple, TypeVar, Union
 from weakref import ref
 
 from ordered_set import OrderedSet
@@ -128,7 +128,7 @@ class Setting(Generic[T]):
         """
         Creates the request body for v1 declaration of this setting
         """
-        declaration_data = {
+        declaration_data: Dict[str, Any] = {
             'name': self.name,
             'configurable_features': list(self.configurable_features),
             'type': self.type.heksher_string(),
