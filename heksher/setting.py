@@ -124,7 +124,10 @@ class Setting(Generic[T]):
         root = collate_rules(context_features, updated_rules)
         self.last_ruleset = RuleSet(ref(client), context_features, root)
 
-    def to_declaration_request(self):
+    def to_v1_declaration_body(self) -> Dict[str, Any]:
+        """
+        Creates the request body for v1 declaration of this setting
+        """
         declaration_data = {
             'name': self.name,
             'configurable_features': list(self.configurable_features),

@@ -164,3 +164,15 @@ def test_setting_rules_collection_callback():
     ])
     assert a.get(x='0') == 7
     assert a.get(x='1') == -1
+
+
+def test_v1_body():
+    a = Setting('a', int, 'abcx', default_value=-1, metadata={"some": "thing"}, alias='aa')
+    assert a.to_v1_declaration_body() == {
+        'name': 'a',
+        'configurable_features': list('abcx'),
+        'type': 'int',
+        'metadata': {"some": "thing"},
+        'alias': 'aa',
+        'default_value': -1,
+    }
