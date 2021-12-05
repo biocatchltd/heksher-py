@@ -9,6 +9,9 @@ Welcome to the Heksher python SDK documentation!
     Installation
     setting
     clients
+    stub_clients
+    exceptions
+    cookbook
 
 `source code <https://github.com/biocatchltd/heksher-py>`_
 

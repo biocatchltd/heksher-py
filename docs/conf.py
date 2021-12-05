@@ -21,6 +21,7 @@ from enum import EnumMeta
 from importlib import import_module
 from inspect import getsourcefile, getsourcelines
 from traceback import print_exc
+from unittest.mock import Mock
 
 project = 'Heksher-py'
 copyright = '2021, Biocatch'
@@ -51,13 +52,19 @@ release = heksher.__version__ or 'master'
 
 # Resolve function for the linkcode extension.
 def linkcode_resolve(domain, info):
+    def is_assignment_node(node: ast.AST, var_name: str) -> bool:
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == var_name:
+                    return True
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == var_name:
+            return True
+        return False
+
     def find_var_lines(parent_source, parent_start_lineno, var_name):
         class_body = ast.parse(''.join(parent_source)).body[0].body
         for node in class_body:
-            if (isinstance(node, ast.Assign)
-                and any(isinstance(target, ast.Name) and target.id == var_name for target in node.targets)) \
-                    or (isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
-                        and node.target.id == var_name):
+            if is_assignment_node(node, var_name):
                 lineno = node.lineno
                 end_lineno = node.end_lineno
                 return parent_source[lineno:end_lineno + 1], lineno + parent_start_lineno - 1
@@ -73,9 +80,12 @@ def linkcode_resolve(domain, info):
             try:
                 new_obj = getattr(obj, part)
             except AttributeError:
-                # sometimes we run into an attribute/thing that doesn't exist at import time, just get the last obj
+                # sometimes we run into an attribute/thing that doesn't exist at import time, assume it's an instance
+                # var
+                item = part
                 break
-            if isinstance(new_obj, (str, int, float, bool, bytes, type(None))) or isinstance(type(new_obj), EnumMeta):
+            if isinstance(new_obj, (str, int, float, bool, bytes, type(None), Mock))\
+                    or isinstance(type(new_obj), EnumMeta):
                 # the object is a variable, we search for it's declaration manually
                 item = part
                 break
