@@ -8,7 +8,7 @@ Clients- Heksher clients
 
     :param service_url: The URL of the Heksher service.
     :param update_interval: The interval in seconds between updates.
-    :param context_features: The context features to check for existance.
+    :param context_features: The context features to check for existence.
     :param http_client_args: Additional keyword arguments to pass to the underlying
         `async HTTPX client <https://www.python-httpx.org/async/>`_.
 
@@ -67,6 +67,8 @@ Clients- Heksher clients
 
         Pings the Heksher service.
 
+        :raises: ``httpx.HTTPError`` if the ping fails.
+
     .. method:: get_settings()->Dict[str, ...]
         :async:
 
@@ -99,7 +101,7 @@ Clients- Heksher clients
 
     :param service_url: The URL of the Heksher service.
     :param update_interval: The interval in seconds between updates.
-    :param context_features: The context features to check for existance.
+    :param context_features: The context features to check for existence.
     :param http_client_args: Additional keyword arguments to pass to the underlying
         `HTTPX client <https://www.python-httpx.org/advanced/#client-instances>`_.
 
@@ -151,6 +153,8 @@ Clients- Heksher clients
     .. method:: ping()->None
 
         Pings the Heksher service.
+
+        :raises: ``httpx.HTTPError`` if the ping fails.
 
     .. method:: get_settings()->Dict[str, ...]
 

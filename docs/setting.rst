@@ -94,7 +94,7 @@ to a global repository upon construction, and are declared and updated by the
 
     .. method:: add_validator(validator: collections.abc.Callable)
 
-        Adds a validator to be called the setting's rules are updated.
+        Adds a validator to be called when the setting's rules are updated.
 
         :param validator: A callable that processes a rule and returns its new value. The callable should accept 3
             positional arguments: The rule's value, the rule's exact-match context variables, and the setting object

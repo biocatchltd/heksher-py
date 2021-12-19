@@ -112,7 +112,7 @@ setting configuration we desire.
 
         .. note::
 
-            In sub clients, when multiple rules are given, they must have the exact same keys, in exactly the same
+            In stub clients, when multiple rules are given, they must have the exact same keys, in exactly the same
             order. These keys will be interpreted as the setting's context features.
 
     :param value: The value to patch the setting with when the conditions are met.
