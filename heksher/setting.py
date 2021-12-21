@@ -68,7 +68,7 @@ class Setting(Generic[T]):
         self._validators.append(validator)
         return validator
 
-    def get(self, **contexts) -> T:
+    def get(self, **contexts: str) -> T:
         """
         Get the value of the setting for the context features.
         Args:

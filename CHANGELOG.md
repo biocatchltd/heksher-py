@@ -1,7 +1,9 @@
 # heksher Changelog
-### 0.1.6
+### Next
 ### Added
 * Added support for setting alias in declaration
+* `__version__` is now a module-level attribute
+* documentation site
 ### 0.1.5
 ### Added
 * Added add_validator method for Setting; Validators added to each Setting will be called by order they were added 
