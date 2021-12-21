@@ -29,7 +29,7 @@ access ``bar`` via its alias (and old name) ``foo``.
 Offline Settings
 ====================
 
-Sometimes we may want to have the Heksher client to be able retrieve the rules from an online heksher service, but we
+Sometimes we may want to have the Heksher client retrieve the rules from an online heksher service, but we
 want to keep the option to override it. We can do this easily with a stub client.
 
 For this example, we'll create the option to override the heksher values with a local file located at
