@@ -26,6 +26,11 @@ This will inform the heksher service that the setting known as ``foo`` should be
 rules associated with it. As an added bonus, any app that uses the older name will not break, as they will be able to
 access ``bar`` via its alias (and old name) ``foo``.
 
+.. warning::
+
+    Setting aliases are backward-compatible, but not in parallel, if two apps attempt to rename the same setting to
+    different names, the second declaration will fail.
+
 Offline Settings
 ====================
 
