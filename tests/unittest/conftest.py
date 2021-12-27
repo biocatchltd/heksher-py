@@ -1,9 +1,7 @@
-import json
-
 from pytest import fixture
-from yellowbox.extras.webserver import WebServer, class_http_endpoint
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
+from yellowbox.extras.webserver import WebServer, class_http_endpoint
 
 import heksher.main_client
 from heksher.heksher_client import TemporaryClient

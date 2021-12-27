@@ -6,14 +6,13 @@ from abc import ABC, abstractmethod
 from contextvars import ContextVar
 from logging import getLogger
 from typing import (
-    AsyncContextManager, Collection, ContextManager, Dict, Iterable, Mapping, MutableMapping, Sequence, Set, Tuple,
-    TypeVar, Union
+    AsyncContextManager, Collection, ContextManager, Iterable, Mapping, MutableMapping, Sequence, Tuple, TypeVar, Union
 )
 from weakref import WeakValueDictionary
 
 from httpx import Response
 from ordered_set import OrderedSet
-from sortedcontainers import SortedList, SortedDict
+from sortedcontainers import SortedDict, SortedList
 
 import heksher.main_client
 from heksher.clients.util import collate_rules

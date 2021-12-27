@@ -1,8 +1,6 @@
-from copy import deepcopy
 from logging import ERROR, WARNING
 from time import sleep
 
-import orjson
 from httpx import HTTPError
 from pytest import mark, raises
 from starlette.responses import JSONResponse, Response
