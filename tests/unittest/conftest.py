@@ -1,58 +1,43 @@
 import json
 
 from pytest import fixture
-from yellowbox.extras.http_server import HttpService, RouterHTTPRequestHandler
+from yellowbox.extras.webserver import WebServer, class_http_endpoint
+from starlette.requests import Request
+from starlette.responses import JSONResponse, Response
 
 import heksher.main_client
 from heksher.heksher_client import TemporaryClient
 
 
+class FakeHeksher(WebServer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.declare_responses = {}
+        self.context_features = []
+
+    @class_http_endpoint('PUT', '/api/v1/settings/declare')
+    async def declare_settings(self, request: Request):
+        data = await request.json()
+        setting_name = data['name']
+        if setting_name in self.declare_responses:
+            return JSONResponse(self.declare_responses[setting_name])
+        if '*' in self.declare_responses:
+            return JSONResponse(self.declare_responses['*'])
+        return Response(status_code=422)
+
+    @class_http_endpoint('GET', '/api/v1/context_features')
+    async def get_context_features(self, request: Request):
+        return JSONResponse({'context_features': self.context_features})
+
+    query_rules = class_http_endpoint('GET', '/api/v1/rules/query', JSONResponse({'settings': {}}))
+    health = class_http_endpoint('GET', '/api/health', Response())
+    get_settings = class_http_endpoint('GET', '/api/v1/settings', JSONResponse({}))
+
+
 @fixture(scope='session')
 def fake_heksher_service():
-    with HttpService(host='localhost').start() as service:
-        service.declare_responses = {}
-        service.context_features = []
-        service.query_response = None
-        service.query_requests = []
-        service.health_response = 200
-        service.settings_response = {}
-
-        service.url = f'http://127.0.0.1:{service.server_port}'
-
-        @service.patch_route('PUT', '/api/v1/settings/declare')
-        def declare(handler: RouterHTTPRequestHandler):
-            request = json.loads(handler.body())
-            setting_name = request['name']
-            if setting_name in service.declare_responses:
-                return json.dumps(service.declare_responses[setting_name])
-            if '*' in service.declare_responses:
-                return json.dumps(service.declare_responses['*'])
-            return 422
-
-        @service.patch_route('GET', '/api/v1/context_features')
-        def get_cfs(handler):
-            return json.dumps({'context_features': service.context_features})
-
-        @service.patch_route('POST', '/api/v1/rules/query')
-        def query(handler):
-            params = json.loads(handler.body())
-            service.query_requests.append(params)
-            if service.query_response:
-                ret = service.query_response
-                service.query_response = None
-                return json.dumps(ret)
-            return json.dumps({'rules': {}})
-
-        @service.patch_route('GET', '/api/health')
-        def health(handler):
-            return service.health_response
-
-        @service.patch_route('GET', '/api/v1/settings')
-        def get_settings(handler):
-            return service.settings_response
-
-        with declare, get_cfs, query, health, get_settings:
-            yield service
+    with FakeHeksher('fakeheksher').start() as service:
+        yield service
 
 
 @fixture(autouse=True)

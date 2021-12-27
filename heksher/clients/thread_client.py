@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from contextvars import ContextVar
-from datetime import datetime
 from logging import getLogger
 from queue import Empty, Queue
 from threading import Event, Lock, Thread
@@ -51,8 +50,6 @@ class ThreadHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin
 
         self._declaration_thread: Optional[Thread] = None
         self._update_thread: Optional[Thread] = None
-
-        self._last_cache_time: Optional[datetime] = None
 
         self.modification_lock = Lock()
         """
@@ -109,24 +106,17 @@ class ThreadHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin
 
         def update():
             logger.debug('heksher reload started')
-            data = {
-                'setting_names': list(self._tracked_settings.keys()),
-                'context_features_options': self._context_feature_options(),
+            response = http_client.get('/api/v1/rules/query', params={
+                'settings': ','.join(sorted(self._tracked_settings.keys())),
+                'context_filters': self._context_filters(),
                 'include_metadata': False,
-            }
-            if self._last_cache_time:
-                data['cache_time'] = self._last_cache_time.isoformat()
-            new_cache_time = datetime.utcnow()
-
-            response = http_client.post('/api/v1/rules/query', content=orjson.dumps(data),
-                                        headers=content_header)
+            }, headers=content_header)
             response.raise_for_status()
 
-            updated_settings = response.json()['rules']
+            updated_settings = response.json()['settings']
             with self.modification_lock:
                 self._update_settings_from_query(updated_settings)
-            self._last_cache_time = new_cache_time
-            logger.info('heksher reload done', extra={'updated_settings': updated_settings.keys()})
+            logger.info('heksher reload done')
 
         while self._keep_going:
             try:

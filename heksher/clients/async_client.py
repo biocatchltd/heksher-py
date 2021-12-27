@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from asyncio import CancelledError, Event, Lock, Queue, Task, TimeoutError, create_task, wait_for
 from contextvars import ContextVar
-from datetime import datetime
 from logging import getLogger
+from traceback import print_exc
 from typing import Any, Dict, NoReturn, Optional, Sequence, TypeVar, Union
 
 import orjson
@@ -48,8 +48,6 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
         self._declaration_task: Optional[Task[NoReturn]] = None
         self._update_task: Optional[Task[NoReturn]] = None
 
-        self._last_cache_time: Optional[datetime] = None
-
         self.modification_lock = Lock()
         """
         A lock that is acquired whenever setting values are updated. To ensure that no modifications are made to
@@ -92,24 +90,19 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
 
         async def update():
             logger.debug('heksher reload started')
-            data = {
-                'setting_names': list(self._tracked_settings.keys()),
-                'context_features_options': self._context_feature_options(),
-                'include_metadata': False,
-            }
-            if self._last_cache_time:
-                data['cache_time'] = self._last_cache_time.isoformat()
-            new_cache_time = datetime.utcnow()
 
-            response = await self._http_client.post('/api/v1/rules/query', content=orjson.dumps(data),
-                                                    headers=content_header)
+            response = await self._http_client.get('/api/v1/rules/query', params={
+                'settings': ','.join(sorted(self._tracked_settings.keys())),
+                'context_filters': self._context_filters(),
+                'include_metadata': False,
+            }, headers=content_header)
+
             response.raise_for_status()
 
-            updated_settings = response.json()['rules']
+            updated_settings = response.json()['settings']
             async with self.modification_lock:
                 self._update_settings_from_query(updated_settings)
-            self._last_cache_time = new_cache_time
-            logger.info('heksher reload done', extra={'updated_settings': list(updated_settings.keys())})
+            logger.info('heksher reload done')
 
         while True:
             try:
@@ -118,6 +111,7 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
                 # in 3.7, cancelled is a normal exception
                 raise
             except Exception:
+                print_exc()
                 logger.exception('error during heksher update')
             finally:
                 self._update_event.set()
