@@ -1,9 +1,12 @@
 # heksher Changelog
 ### Next
+This version is only compatible with heksher 0.5.0 and above.
 ### Added
 * Added support for setting alias in declaration
 * `__version__` is now a module-level attribute
 * documentation site
+### Changed
+* only the new heksher API is now supported
 ### 0.1.5
 ### Added
 * Added add_validator method for Setting; Validators added to each Setting will be called by order they were added 

@@ -3,17 +3,16 @@ from __future__ import annotations
 import asyncio
 import queue
 from abc import ABC, abstractmethod
-from collections import defaultdict
 from contextvars import ContextVar
 from logging import getLogger
 from typing import (
-    AsyncContextManager, Collection, ContextManager, Dict, Iterable, Mapping, MutableMapping, Sequence, Set, Tuple,
-    TypeVar, Union
+    AsyncContextManager, Collection, ContextManager, Iterable, Mapping, MutableMapping, Sequence, Tuple, TypeVar, Union
 )
 from weakref import WeakValueDictionary
 
 from httpx import Response
 from ordered_set import OrderedSet
+from sortedcontainers import SortedDict, SortedList
 
 import heksher.main_client
 from heksher.clients.util import collate_rules
@@ -42,7 +41,7 @@ class V1APIClient(BaseHeksherClient, ABC):
         super().__init__()
         self._context_features: OrderedSet[str] = OrderedSet(context_features)
 
-        self._tracked_context_options: Dict[str, Union[Set[str], str]] = defaultdict(set)
+        self._tracked_context_options: SortedDict[str, Union[SortedList[str], str]] = SortedDict()
         # the tracked options can also include the sentinel value TRACK_ALL
         # value will always be a set or TRACK_ALL, Literal is not supported in python 3.7
         self._tracked_settings: MutableMapping[str, Setting] = WeakValueDictionary()
@@ -85,13 +84,21 @@ class V1APIClient(BaseHeksherClient, ABC):
                 continue
             if isinstance(v, str):
                 v = (v,)
-            if self._tracked_context_options[k] == TRACK_ALL:
+            existing = self._tracked_context_options.get(k)
+            if existing == TRACK_ALL:
                 raise RuntimeError("cannot track a specific value after the feature's been set to TRACK_ALL")
-            self._tracked_context_options[k].update(v)  # type: ignore
+            if existing is None:
+                self._tracked_context_options[k] = SortedList(v)
+            else:
+                self._tracked_context_options[k].update(v)  # type: ignore
 
-    def _context_feature_options(self):
-        return {k: (TRACK_ALL if v == TRACK_ALL else list(v))
-                for k, v in self._tracked_context_options.items()}
+    def _context_filters(self):
+        def context_filter(filter_):
+            if filter_ == TRACK_ALL:
+                return '*'
+            return '(' + ','.join(filter_) + ')'
+
+        return ','.join((f'{k}:{context_filter(v)}' for k, v in self._tracked_context_options.items()))
 
     def _handle_declaration_response(self, setting: Setting, response: Response):
         """
@@ -120,8 +127,9 @@ class V1APIClient(BaseHeksherClient, ABC):
         Args:
             updated_settings: A mapping of settings, with updated rules from the HTTP service
         """
-        for setting_name, rule_mappings in updated_settings.items():
+        for setting_name, setting_results in updated_settings.items():
             setting = self._tracked_settings[setting_name]
+            rule_mappings = setting_results['rules']
             rules = ((rm['context_features'], setting.type.convert(rm['value'])) for rm in rule_mappings)
             setting.update(self, self._context_features, rules)
 
