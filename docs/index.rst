@@ -11,6 +11,7 @@ Welcome to the Heksher python SDK documentation!
     clients
     stub_clients
     exceptions
+    compatibility
     cookbook
 
 `source code <https://github.com/biocatchltd/heksher-py>`_

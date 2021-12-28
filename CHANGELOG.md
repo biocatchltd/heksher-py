@@ -1,5 +1,6 @@
 # heksher Changelog
 ### Next
+This version is only compatible with heksher 0.5.0 and above.
 ### Added
 * Added support for setting alias in declaration
 * `__version__` is now a module-level attribute
