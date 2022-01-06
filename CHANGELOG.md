@@ -1,12 +1,29 @@
-# heksher Changelog
-### Next
+# heksher-py Changelog
+### 0.2.0
 This version is only compatible with heksher 0.5.0 and above.
 ### Added
 * Added support for setting alias in declaration
 * `__version__` is now a module-level attribute
 * documentation site
+* HeksherEnum, HeksherFlags, HeksherMapping, and HeksherSequence are now public, and are the 
+  preferred way to create complex setting types.
+* client.get_settings() also includes the setting's version and alias
+* setting.on_coerce, a callable to use if value coercion occurs.
+* type coercion and rejection is now supported
+### Removed
+* stub rules no longer accept `None` feature values
 ### Changed
 * only the new heksher API is now supported
+* stub rules now don't have to all have the same context features.
+* the server's default value is now respected over the local default value.
+* validators now accept the rule object as retrieved from the server
+* Each setting now only requires its configurable features to be specified.
+* If an async client fails startup or reload, it raises an error.
+* default values are now required for settings.
+### Deprecated
+* Creating settings with an alias type, enum type, or flags type is deprecated. use HeksherEnum, HeksherFlags, 
+  HeksherMapping, or HeksherSequence instead.
+* using ``patch`` for stub clients is now deprecated. Prefer to set the ``rules`` attribute instead.
 ### 0.1.5
 ### Added
 * Added add_validator method for Setting; Validators added to each Setting will be called by order they were added 

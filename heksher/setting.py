@@ -9,13 +9,28 @@ from weakref import ref
 from ordered_set import OrderedSet
 
 import heksher.main_client
-from heksher.clients.util import NO_DEFAULT, RuleBranch, collate_rules
+from heksher.clients.util import RuleBranch, collate_rules
 from heksher.exceptions import NoMatchError
-from heksher.setting_type import setting_type
+from heksher.setting_type import Conversion, setting_type
+
+no_match = object()
 
 logger = getLogger(__name__)
 
 T = TypeVar('T')
+
+
+@dataclass
+class QueriedRule:
+    rule_id: Optional[int]
+    context_features: Sequence[Tuple[str, str]]
+
+
+Validator = Callable[[T, Optional[QueriedRule], 'Setting'], T]
+
+
+def _reject_on_coerce(x, _0, _1, _2, setting):
+    raise TypeError(f'coercion is disabled for {setting.name}, coercions: {x.coercions}')
 
 
 class Setting(Generic[T]):
@@ -23,10 +38,10 @@ class Setting(Generic[T]):
     A setting object, that stores a ruleset and can be updated by heksher clients
     """
 
-    def __init__(self, name: str, type, configurable_features: Sequence[str],
-                 default_value: T = NO_DEFAULT,  # type: ignore
-                 metadata: Optional[Mapping[str, Any]] = None,
-                 alias: Optional[str] = None):
+    def __init__(self, name: str, type: Any, configurable_features: Sequence[str], default_value: T,
+                 metadata: Optional[Mapping[str, Any]] = None, alias: Optional[str] = None, version: str = '1.0',
+                 on_coerce: Optional[Callable[[T, Any, Sequence[str], Optional[QueriedRule], 'Setting'], T]]
+                 = lambda x, *args: x):
         """
         Args:
             name: The name of the setting.
@@ -36,6 +51,10 @@ class Setting(Generic[T]):
             default_value: The default value of the setting, this value will be returned if no rules match the current
              context.
             metadata: Additional metadata of the setting.
+            alias: An alias for the setting.
+            version: The version of the setting.
+            on_coerce: A function to be called after a server value resulter in coercion. Should return a local value,
+             or raise a TypeError. Set to None to always raise a type error.
         Notes:
             Creating a setting automatically registers it to be declared at the main heksher client.
         """
@@ -45,15 +64,32 @@ class Setting(Generic[T]):
         self.default_value = default_value
         self.metadata = metadata or {}
         self.alias = alias
+        self.version_str = version
+        self.version = tuple(int(x) for x in version.split('.', 1))
+
+        if on_coerce is None:
+            on_coerce = _reject_on_coerce
+
+        self.on_coerce = on_coerce
 
         self.last_ruleset: Optional[RuleSet] = None
 
-        self._validators: List[Callable[[T, Sequence[Tuple[str, str]], Setting], T]] = []
+        self._validators: List[Validator[T]] = []
+        self.server_default_value: Optional[T] = None
 
         heksher.main_client.Main.add_settings((self,))
 
-    def add_validator(self, validator: Callable[[T, Sequence[Tuple[str, str]], Setting], T]) \
-            -> Callable[[T, Sequence[Tuple[str, str]], Setting], T]:
+    def convert_server_value(self, raw_value: Any, rule: Optional[QueriedRule]) -> Conversion[T]:
+        convert = self.type.convert(raw_value)
+        if convert.coercions:
+            value = self.on_coerce(convert.value, raw_value, convert.coercions, rule, self)
+        else:
+            value = convert.value
+        for validator in self._validators:
+            value = validator(value, rule, self)
+        return Conversion(value, convert.coercions)
+
+    def add_validator(self, validator: Validator[T]) -> Validator[T]:
         """
         Add a validator to be called when the setting's value is updated.
         If multiple callbacks are added, they are called in the order they are added.
@@ -89,24 +125,21 @@ class Setting(Generic[T]):
             try:
                 from_rules = self.last_ruleset.resolve(contexts, self)
             except NoMatchError:
-                from_rules = NO_DEFAULT
+                from_rules = no_match
         else:
-            logger.warning('the value of setting was never retrieved from service', extra={'setting': self.name})
-            from_rules = NO_DEFAULT
+            logger.info('the value of setting was never retrieved from service', extra={'setting': self.name})
+            from_rules = no_match
 
-        if from_rules is NO_DEFAULT:
-            if self.default_value is NO_DEFAULT:
-                raise NoMatchError(self.name)
-            return self.default_value
+        if from_rules is no_match:
+            return self.server_default_value if self.server_default_value is not None else self.default_value
         return from_rules
 
-    def update(self, client, context_features: Sequence[str], rules: Iterable[Tuple[Sequence[Tuple[str, str]], T]]):
+    def update(self, client, rules: Iterable[Tuple[T, QueriedRule]]):
         """
         Update a setting's rules from a client
 
         Args:
             client: The client updating the setting.
-            context_features: The context features the root was collated by.
             rules: An iterable of rules to collate.
         """
         if self.last_ruleset:
@@ -115,29 +148,23 @@ class Setting(Generic[T]):
                 logger.warning('setting received rule set from multiple clients',
                                extra={'setting': self.name, 'new_client': client, 'last_client': last_client})
 
-        def validate(rule: Sequence[Tuple[str, str]], value: T) -> T:
-            for validator in self._validators:
-                value = validator(value, rule, self)
-            return value
-
-        updated_rules = [(rule, validate(rule, value)) for (rule, value) in rules]
-        root = collate_rules(context_features, updated_rules)
-        self.last_ruleset = RuleSet(ref(client), context_features, root)
+        validated_rules = [(rule.context_features, value) for (value, rule) in rules]
+        root = collate_rules(self.configurable_features, validated_rules)
+        self.last_ruleset = RuleSet(ref(client), root)
 
     def to_v1_declaration_body(self) -> Dict[str, Any]:
         """
         Creates the request body for v1 declaration of this setting
         """
-        declaration_data: Dict[str, Any] = {
+        return {
             'name': self.name,
             'configurable_features': list(self.configurable_features),
             'type': self.type.heksher_string(),
             'metadata': self.metadata,
             'alias': self.alias,
+            'default_value': self.default_value,
+            'version': self.version_str,
         }
-        if self.default_value is not NO_DEFAULT:
-            declaration_data['default_value'] = self.default_value
-        return declaration_data
 
 
 @dataclass(frozen=True)
@@ -165,27 +192,12 @@ class RuleSet(Generic[T]):
     """
     A weakref to the client that supplied the ruleset
     """
-    context_features: Sequence[str]
-    """
-    The context features the root rulebranch was collated against
-    """
     root: RuleBranch[T]
     """
     The root rulebranch
     """
 
     def resolve(self, context_namespace: Mapping[str, str], setting: Setting):
-        """
-        Args:
-            context_namespace: A namespace of context features and their values. If the client is available, its
-             context_namespace method is used beforehand.
-
-        Returns:
-            The value of the deepest-matched rule
-
-        Raises:
-            NoMatchError, if no rules matched the namespace
-        """
         client = self.client()
         if client:
             context_namespace = client.context_namespace(context_namespace)
@@ -203,22 +215,19 @@ class RuleSet(Generic[T]):
                 Either False for no matches within the branch, or a RuleMatch with the maximal branch.
 
             """
-            if depth == len(self.context_features):
+            if depth == len(setting.configurable_features):
                 # leaf node
                 return RuleMatch(current, exact_match_depth)
 
             assert isinstance(current, Mapping)
 
-            feature = self.context_features[depth]
-            if feature in setting.configurable_features:
-                feature_value = context_namespace.get(feature)
-                if feature_value is None:
-                    raise RuntimeError(f'configurable context feature {feature} is missing from both the default'
-                                       ' namespace and arguments')
+            feature = setting.configurable_features[depth]
+            feature_value = context_namespace.get(feature)
+            if feature_value is None:
+                raise RuntimeError(f'configurable context feature {feature} is missing from both the default'
+                                   ' namespace and arguments')
 
-                exact = (feature_value in current) and _resolve(current[feature_value], depth + 1, depth)
-            else:
-                exact = None
+            exact = (feature_value in current) and _resolve(current[feature_value], depth + 1, depth)
 
             wildcard = (None in current) and _resolve(current[None], depth + 1, exact_match_depth)
 

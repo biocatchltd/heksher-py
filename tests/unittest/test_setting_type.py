@@ -1,56 +1,100 @@
 from enum import Enum, IntFlag, auto
 from typing import Mapping, Sequence
 
-from pytest import raises
+from pytest import mark, raises
 
-from heksher.setting_type import setting_type
+from heksher import HeksherEnum, HeksherFlags, HeksherMapping, HeksherSequence
+from heksher.setting_type import Conversion, setting_type
 
 
-def test_enum_type():
+@mark.parametrize('type_func', [lambda t: t, lambda t: HeksherEnum(t)])
+def test_enum_type(type_func):
     class A(Enum):
         a = 0
         b = 1
         c = 'c'
         d = 3.5
 
-    t = setting_type(A)
+    t = setting_type(type_func(A))
     assert t.heksher_string() == 'Enum["c",0,1,3.5]'
-    assert t.convert(0) == A.a
-    assert t.convert("c") == A.c
-    with raises(ValueError):
+    assert t.convert(0) == Conversion(A.a)
+    assert t.convert("c") == Conversion(A.c)
+    with raises(TypeError):
         assert t.convert("b")
 
 
-def test_flag_type():
+@mark.parametrize('type_func', [lambda t: t, lambda t: HeksherFlags(t)])
+def test_flag_type(type_func):
     class B(IntFlag):
         a = auto()
         b = auto()
 
-    t = setting_type(B)
+    t = setting_type(type_func(B))
 
     assert t.heksher_string() == 'Flags["a","b"]'
-    assert t.convert(["a", "c"]) == B.a
-    assert t.convert([]) == B(0)
-    assert t.convert(["a", "b"]) == B.a | B.b
+    assert t.convert(["a", "c"]) == Conversion(B.a, ['server sent a flag value not found in the python type (c)'])
+    assert t.convert([]) == Conversion(B(0), [])
+    assert t.convert(["a", "b"]) == Conversion(B.a | B.b, [])
 
 
-def test_sequence():
+@mark.parametrize('type_func', [lambda t: Sequence[t], lambda t: HeksherSequence(HeksherEnum(t))])
+def test_sequence(type_func):
     class Color(Enum):
         red = 'red'
         blue = 'blue'
         green = 'green'
 
-    t = setting_type(Sequence[Color])
+    t = setting_type(type_func(Color))
     assert t.heksher_string() == 'Sequence<Enum["blue","green","red"]>'
-    assert t.convert(["green", "red", "blue", "green"]) == (Color.green, Color.red, Color.blue, Color.green)
+    assert t.convert(["green", "red", "blue", "green"]) == Conversion((Color.green, Color.red, Color.blue, Color.green),
+                                                                      [])
 
 
-def test_mapping():
+@mark.parametrize('type_func', [lambda t: Sequence[t], lambda t: HeksherSequence(HeksherEnum(t))])
+def test_sequence_coerce(type_func):
     class Color(Enum):
         red = 'red'
         blue = 'blue'
         green = 'green'
 
-    t = setting_type(Mapping[str, Color])
+    t = setting_type(type_func(Color))
+    assert t.heksher_string() == 'Sequence<Enum["blue","green","red"]>'
+    assert t.convert(["green", "red", "blue", 'white', "green"]) == Conversion(
+        (Color.green, Color.red, Color.blue, Color.green),
+        ["failed to convert element 3: TypeError('value is not a valid enum member')"])
+
+
+@mark.parametrize('type_func', [lambda t: Mapping[str, t], lambda t: HeksherMapping(HeksherEnum(t))])
+def test_mapping(type_func):
+    class Color(Enum):
+        red = 'red'
+        blue = 'blue'
+        green = 'green'
+
+    t = setting_type(type_func(Color))
     assert t.heksher_string() == 'Mapping<Enum["blue","green","red"]>'
-    assert t.convert({'fg': 'blue', 'bg': 'red'}) == {'fg': Color.blue, 'bg': Color.red}
+    assert t.convert({'fg': 'blue', 'bg': 'red'}) == Conversion({'fg': Color.blue, 'bg': Color.red}, [])
+
+
+@mark.parametrize('type_func', [lambda t: Mapping[str, t], lambda t: HeksherMapping(HeksherEnum(t))])
+def test_mapping_coerce(type_func):
+    class Color(Enum):
+        red = 'red'
+        blue = 'blue'
+        green = 'green'
+
+    t = setting_type(type_func(Color))
+    assert t.heksher_string() == 'Mapping<Enum["blue","green","red"]>'
+    assert t.convert({'fg': 'blue', 'bg': 'red', 'tx': 'white'}) == Conversion({'fg': Color.blue, 'bg': Color.red}, [
+        "failed to convert value for key tx: TypeError('value is not a valid enum member')"
+    ])
+
+
+def test_int_type():
+    t = setting_type(int)
+    assert t.heksher_string() == 'int'
+    assert t.convert(1) == Conversion(1)
+    with raises(TypeError):
+        t.convert(1.5)
+    with raises(TypeError):
+        t.convert('1')

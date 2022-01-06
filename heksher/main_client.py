@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 # avoid circular import
-if TYPE_CHECKING:
-    from heksher.heksher_client import BaseHeksherClient  # pragma: nocover
+if TYPE_CHECKING:  # pragma: nocover
+    from heksher.heksher_client import BaseHeksherClient
 
 Main: BaseHeksherClient
 """

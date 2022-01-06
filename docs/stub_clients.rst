@@ -21,8 +21,8 @@ setting configuration we desire.
         return color_rgb_to_name(fore_rgb)
 
 .. code-block::
-    :caption: How to test the above code in pytest with a stub client
-    :emphasize-lines: 7, 11, 15-18
+    :caption: How to test the above code in pytest with a stub client in pytest
+    :emphasize-lines: 7, 11-12, 16-19
 
     from pytest import fixture
     from heksher.clients.stub import SyncStubClient, Rule
@@ -33,18 +33,19 @@ setting configuration we desire.
         with SyncStubClient() as stub_client:
             yield stub_client
 
-    def test_foreground_color(stub_client):
-        with stub_client.patch(background_color, 'red'):
-            assert foreground_color("any_theme") == 'cyan'
+    def test_foreground_color(stub_client, monkeypatch):
+        # will ensure that background_color.get() will return 'red'
+        monkeypatch.setattr(stub_client[background_color], 'rules', 'red')
+        assert foreground_color("any_theme") == 'cyan'
 
-    def test_foreground_color_by_theme(stub_client):
-        with stub_client.patch(background_color, [
+    def test_foreground_color_by_theme(stub_client, monkeypatch):
+        monkeypatch.setattr(stub_client[background_color], 'rules', [
                 Rule({'theme': 'dark'}, 'black'),
                 Rule({'theme': 'light'}, 'white'),
-            ]):
-            assert foreground_color("dark") == 'white'
-            assert foreground_color("white") == 'black'
-            assert foreground_color("dracula") == 'yellow'  # default is still blue
+        ])
+        assert foreground_color("dark") == 'white'
+        assert foreground_color("white") == 'black'
+        assert foreground_color("dracula") == 'yellow'  # default is still blue
 
 .. module:: clients.stub
 
@@ -54,9 +55,17 @@ setting configuration we desire.
 
     This class can be used as a context manager. Entering and exiting it does nothing.
 
+    .. method:: __getitem__(setting : setting.Setting[T])->SettingPatcher[T]
+
+        Get a SettingPatcher that can be used to patch the given setting.
+
     .. method:: patch(setting : setting.Setting, value: T | collections.abc.Collection[Rule[T]])
 
         Patch the given setting with the given value.
+
+        .. note::
+
+            Using the :meth:`patcher method <__getitem__>` is preferred.
 
         :param setting: The setting to patch
         :param value: The value to patch it with, or a collection of rules to patch it with. If rules are given, they
@@ -81,13 +90,20 @@ setting configuration we desire.
 
     This class can be used as an async context manager. Entering and exiting it does nothing.
 
+    .. method:: __getitem__(setting : setting.Setting[T])->SettingPatcher[T]
+
+        Get a SettingPatcher that can be used to patch the given setting.
+
     .. method:: patch(setting : setting.Setting, value: T | collections.abc.Collection[Rule[T]])
 
         Patch the given setting with the given value.
 
+        .. note::
+
+            Using the :meth:`patcher method <__getitem__>` is preferred.
+
         :param setting: The setting to patch
-        :param value: The value to patch it with, or a collection of rules to patch it with. If rules are given, they
-            must all address exactly the same context features in exactly the same order.
+        :param value: The value to patch it with, or a collection of rules to patch it with.
         :return: A context manager that will restore the setting to its original value when exiting
 
     .. attribute:: reload
@@ -102,18 +118,22 @@ setting configuration we desire.
 
         A :class:`~unittest.mock.AsyncMock` object that mocks the :meth:`~AsyncHeksherClient.ping` method.
 
-.. class:: Rule(match_conditions: collections.abc.Mapping[str, str | None], value: T)
+.. class:: Rule(match_conditions: collections.abc.Mapping[str, str], value: T)
 
     A rule used to patch a setting's value depending on context features.
 
     This class is a dataclass.
 
     :param match_conditions: A mapping of context feature names to their exact-match conditions.
-
-        .. note::
-
-            In stub clients, when multiple rules are given, they must have the exact same keys, in exactly the same
-            order. These keys will be interpreted as the setting's context features.
-
     :param value: The value to patch the setting with when the conditions are met.
 
+.. class:: SettingPatcher(...)
+
+    An object that can be used to patch a setting.
+
+    .. property:: rules
+
+        Set to this property either a single value, or a collection of :class:`Rules <Rule>`.
+
+        This property can be used to temporarily patch the setting with patchers like :class:`unittest.mock.patch` or
+        pytest's `monkeypatch <https://docs.pytest.org/en/latest/how-to/monkeypatch.html>`_ fixture.

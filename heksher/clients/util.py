@@ -11,8 +11,6 @@ from heksher.util import zip_supersequence
 logger = getLogger(__name__)
 T = TypeVar('T')
 
-NO_DEFAULT = object()
-
 
 RuleBranch = Union[Mapping[Optional[str], 'RuleBranch[T]'], T]  # type: ignore[misc]
 """
@@ -67,8 +65,8 @@ def collate_rules(keys: Sequence[str], rules: Iterable[Tuple[Sequence[Tuple[str,
         try:
             conds, ret = next(rule_iter)
         except StopIteration:
-            # no rules at all
-            return NO_DEFAULT  # type: ignore
+            # no rules at all, we can return an empty depth 1 branch here and count on the resolver misses to handle it
+            return {}
         assert not conds
         # we assert that there is, at most, one rule
         try:
@@ -110,16 +108,14 @@ def collate_rules(keys: Sequence[str], rules: Iterable[Tuple[Sequence[Tuple[str,
     return root
 
 
-def orjson_dumps(v, **kwargs):
-    return str(orjson.dumps(v, **kwargs), 'utf-8')
-
-
 class SingleSettingData(BaseModel):
     name: str
     configurable_features: List[str]
     type: str
     default_value: Any
     metadata: Dict[str, Any]
+    aliases: List[str]
+    version: str
 
     def to_setting_data(self):
         return SettingData(
@@ -128,6 +124,8 @@ class SingleSettingData(BaseModel):
             type=self.type,
             default_value=self.default_value,
             metadata=self.metadata,
+            aliases=self.aliases,
+            version=self.version,
             )
 
 
@@ -135,7 +133,6 @@ class SettingsOutput(BaseModel):
     settings: List[SingleSettingData]
 
     class Config:
-        json_dumps = orjson_dumps
         json_loads = orjson.loads
 
     def to_settings_data(self) -> Dict:
@@ -149,3 +146,5 @@ class SettingData:
     type: str
     default_value: Any
     metadata: Dict[str, Any]
+    aliases: List[str]
+    version: str

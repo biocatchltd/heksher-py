@@ -27,7 +27,7 @@ class FakeHeksher(WebServer):
     async def get_context_features(self, request: Request):
         return JSONResponse({'context_features': self.context_features})
 
-    query_rules = class_http_endpoint('GET', '/api/v1/rules/query', JSONResponse({'settings': {}}))
+    query_rules = class_http_endpoint('GET', '/api/v1/query', JSONResponse({'settings': {}}))
     health = class_http_endpoint('GET', '/api/health', Response())
     get_settings = class_http_endpoint('GET', '/api/v1/settings', JSONResponse({}))
 

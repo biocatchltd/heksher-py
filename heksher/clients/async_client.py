@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from asyncio import CancelledError, Event, Lock, Queue, Task, TimeoutError, create_task, wait_for
+from asyncio import (
+    FIRST_COMPLETED, CancelledError, Event, Future, Lock, Queue, Task, TimeoutError, create_task, get_running_loop,
+    wait, wait_for
+)
 from contextvars import ContextVar
 from logging import getLogger
-from traceback import print_exc
-from typing import Any, Dict, NoReturn, Optional, Sequence, TypeVar, Union
+from typing import Any, Awaitable, Dict, NoReturn, Optional, Sequence, TypeVar, Union
 
 import orjson
 from httpx import AsyncClient, HTTPError
-from ordered_set import OrderedSet
 
 from heksher.clients.subclasses import AsyncContextManagerMixin, ContextFeaturesMixin, V1APIClient
 from heksher.clients.util import SettingsOutput
@@ -58,6 +59,10 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
         """This event marks that an update occurred"""
         self._manual_update = Event()
         """This event is waited on by the update loop (with a timeout), set it to instantly begin an update"""
+        self._declaration_error: Optional[Future[NoReturn]] = None
+        """This future will throw an exception if a declaration fails"""
+        self._update_error: Optional[Future[NoReturn]] = None
+        """This future will throw an exception if an update fails"""
 
     async def _declaration_loop(self) -> NoReturn:
         """
@@ -71,17 +76,20 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
             self._handle_declaration_response(setting, response)
 
         while True:
-            setting = await self._undeclared.get()
+            setting = None
             try:
+                setting = await self._undeclared.get()
                 await declare_setting(setting)
             except CancelledError:
                 # in 3.7, cancelled is a normal exception
                 raise
-            except Exception:
-                logger.exception('setting declaration failed',
-                                 extra={'setting': setting.name})
+            except Exception as e:
+                logger.exception('setting declaration failed', extra={'setting': setting and setting.name})
+                if self._declaration_error is not None:
+                    self._declaration_error.set_exception(e)
             finally:
-                self._undeclared.task_done()
+                if setting:
+                    self._undeclared.task_done()
 
     async def _update_loop(self) -> NoReturn:
         """
@@ -91,7 +99,7 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
         async def update():
             logger.debug('heksher reload started')
 
-            response = await self._http_client.get('/api/v1/rules/query', params={
+            response = await self._http_client.get('/api/v1/query', params={
                 'settings': ','.join(sorted(self._tracked_settings.keys())),
                 'context_filters': self._context_filters(),
                 'include_metadata': False,
@@ -110,9 +118,10 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
             except CancelledError:
                 # in 3.7, cancelled is a normal exception
                 raise
-            except Exception:
-                print_exc()
+            except Exception as e:
                 logger.exception('error during heksher update')
+                if self._update_error is not None:
+                    self._update_error.set_exception(e)
             finally:
                 self._update_event.set()
 
@@ -122,6 +131,32 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
                 await wait_for(self._manual_update.wait(), self._update_interval)
             except TimeoutError:
                 pass
+
+    async def _wait_for_declaration_error(self) -> NoReturn:
+        """
+        Waits for the declaration error to occur.
+        """
+        if self._declaration_error is not None:
+            await self._declaration_error
+        self._declaration_error = get_running_loop().create_future()
+        try:
+            await self._declaration_error
+        except CancelledError:
+            self._declaration_error = None
+            raise
+
+    async def _wait_for_update_error(self) -> NoReturn:
+        """
+        Waits for the declaration error to occur.
+        """
+        if self._update_error is not None:
+            await self._update_error
+        self._update_error = get_running_loop().create_future()
+        try:
+            await self._update_error
+        except CancelledError:
+            self._update_error = None
+            raise
 
     async def set_as_main(self):
         await super().set_as_main()
@@ -140,15 +175,17 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
                     'features_in_service': features_in_service,
                     'features_in_client': self._context_features
                 })
-                # we let the service decide the features to avoid future conflict
-                self._context_features = OrderedSet(features_in_service)
 
-        self._declaration_task = create_task(self._declaration_loop())
-        # important to only start the update thread once all pending settings are declared, otherwise we may have
-        # stale settings
-        await self._undeclared.join()
-        self._update_task = create_task(self._update_loop())
-        await self.reload()
+        try:
+            self._declaration_task = create_task(self._declaration_loop())
+            await wait_with_err_sentinel(self._undeclared.join(), self._wait_for_declaration_error())
+            # important to only start the update thread once all pending settings are declared, otherwise we may have
+            # stale settings
+            self._update_task = create_task(self._update_loop())
+            await self.reload()
+        except Exception:
+            await self.close()
+            raise
 
     async def reload(self):
         """
@@ -157,7 +194,7 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
         await self._undeclared.join()
         self._update_event.clear()
         self._manual_update.set()
-        await self._update_event.wait()
+        await wait_with_err_sentinel(self._update_event.wait(), self._wait_for_update_error())
 
     async def close(self):
         await super().close()
@@ -203,3 +240,15 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
         response.raise_for_status()
         settings = SettingsOutput.parse_obj(response.json()).to_settings_data()
         return settings
+
+
+async def wait_with_err_sentinel(coro: Awaitable, err_future: Awaitable[NoReturn]):
+    done, pending = await wait((coro, err_future), return_when=FIRST_COMPLETED)
+    for future in pending:
+        future.cancel()
+        try:
+            await wait_for(future, 0.01)
+        except CancelledError:
+            pass
+    for future in done:
+        await future

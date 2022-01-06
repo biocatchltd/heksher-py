@@ -8,7 +8,6 @@ from typing import Any, Dict, Optional, Sequence, TypeVar, Union
 
 import orjson
 from httpx import Client, HTTPError
-from ordered_set import OrderedSet
 
 from heksher.clients.subclasses import ContextFeaturesMixin, ContextManagerMixin, V1APIClient
 from heksher.clients.util import SettingsOutput
@@ -106,7 +105,7 @@ class ThreadHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin
 
         def update():
             logger.debug('heksher reload started')
-            response = http_client.get('/api/v1/rules/query', params={
+            response = http_client.get('/api/v1/query', params={
                 'settings': ','.join(sorted(self._tracked_settings.keys())),
                 'context_filters': self._context_filters(),
                 'include_metadata': False,
@@ -146,8 +145,6 @@ class ThreadHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin
                     'features_in_service': features_in_service,
                     'features_in_client': self._context_features
                 })
-                # we let the service decide the features to avoid future conflict
-                self._context_features = OrderedSet(features_in_service)
 
         self._declaration_thread = Thread(target=self._declare_loop, daemon=True)
         self._declaration_thread.start()

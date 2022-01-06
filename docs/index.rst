@@ -8,7 +8,9 @@ Welcome to the Heksher python SDK documentation!
     Introduction
     Installation
     setting
+    setting_types
     clients
+    outdated_declarations
     stub_clients
     exceptions
     compatibility
