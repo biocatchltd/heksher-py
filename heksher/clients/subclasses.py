@@ -115,7 +115,7 @@ class V1APIClient(BaseHeksherClient, ABC):
             latest_version_str = response_data.get('latest_version')
             if latest_version_str is None:
                 logger.error('outdated setting without latest version', extra={'setting_name': setting.name})
-                latest_version: Tuple[int, int] = float('inf'), float('inf')  # type: ignore[assignment]
+                latest_version: Tuple[int, int] = (float('inf'), float('inf'))  # type: ignore[assignment]
             else:
                 latest_version = tuple(map(int, latest_version_str.split('.', 1)))  # type: ignore[assignment]
             if latest_version[0] != setting.version[0]:
