@@ -88,5 +88,3 @@ to a global repository upon construction, and are declared and updated by the
 
         Returns the value of the highest-priority rule to match the context, or the setting's default value if not
         rules matched.
-
-        :raises NoMatchError: if no rules matched and no default value was specified.
