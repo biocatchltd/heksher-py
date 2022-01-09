@@ -56,8 +56,8 @@ to a global repository upon construction, and are declared and updated by the
         Adds a validator to be called when the setting's rules are updated.
 
         :param validator: A callable that processes a rule or server default and returns its new value. The callable
-            should accept 3 positional arguments: The rule's value, the rule object (or noe for server defaults), and
-            the setting object itself. Validators may raise a :exc:`TypeError` to reject the value.
+            should accept 3 positional arguments: The rule's value, the rule object (or ``None`` for server defaults),
+            and the setting object itself. Validators may raise a :exc:`TypeError` to reject the value.
 
         .. code-block::
 

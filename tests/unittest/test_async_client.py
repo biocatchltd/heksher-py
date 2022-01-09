@@ -219,6 +219,23 @@ async def test_outdated_declaration_different_default(fake_heksher_service, monk
 
 
 @atest
+async def test_upgraded_declaration_different_default(fake_heksher_service, monkeypatch, caplog):
+    monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b', 'c'])
+    monkeypatch.setitem(fake_heksher_service.declare_responses, 'cache_size', {
+        'outcome': 'upgraded',
+        'latest_version': '0.5',
+        'differences': [
+            {'level': 'minor', 'attribute': 'default_value', 'latest_value': 100}
+        ]
+    })
+
+    setting = Setting('cache_size', int, ['b', 'c'], 50)
+
+    async with AsyncHeksherClient(fake_heksher_service.local_url(), 10000000, ['a', 'b', 'c']):
+        assert setting.get(b='', c='') == 50
+
+
+@atest
 async def test_flags_setting(fake_heksher_service, monkeypatch):
     monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b', 'c'])
     monkeypatch.setitem(fake_heksher_service.declare_responses, 'c', {

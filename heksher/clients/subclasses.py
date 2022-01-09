@@ -6,7 +6,8 @@ from abc import ABC, abstractmethod
 from contextvars import ContextVar
 from logging import getLogger
 from typing import (
-    AsyncContextManager, Collection, ContextManager, Iterable, Mapping, MutableMapping, Sequence, Tuple, TypeVar, Union
+    Any, AsyncContextManager, Collection, ContextManager, Iterable, Mapping, MutableMapping, Sequence, Tuple, TypeVar,
+    Union
 )
 from weakref import WeakValueDictionary
 
@@ -23,6 +24,25 @@ logger = getLogger(__name__)
 T = TypeVar('T')
 
 TRACK_ALL = '*'
+
+
+def apply_difference(setting: Setting, difference: Mapping[str, Any]) -> None:
+    attr = difference.get('attribute')
+    # right now we only know how to handle the 'default_value' attribute difference
+    if attr == 'default_value':
+        server_default_value = difference.get('latest_value')
+        try:
+            convert = setting.convert_server_value(server_default_value, None)
+        except TypeError:
+            logger.warning('server default was discarded due to coercion error during declaration',
+                           exc_info=True,
+                           extra={'setting_name': setting.name, 'server_default_value': server_default_value})
+        else:
+            if convert.coercions:
+                logger.warning('server default was coerced to local value during declaration', extra={
+                    'setting_name': setting.name, 'server_default_value': server_default_value,
+                    'coercions': convert.coercions})
+            setting.server_default_value = convert.value
 
 
 class V1APIClient(BaseHeksherClient, ABC):
@@ -120,39 +140,20 @@ class V1APIClient(BaseHeksherClient, ABC):
                 latest_version = tuple(map(int, latest_version_str.split('.', 1)))  # type: ignore[assignment]
             if latest_version[0] != setting.version[0]:
                 logger.warning('setting is outdated by a major version',
-                               extra={'setting_name': setting.name,
-                                      'differences': response_data.get('differences'),
-                                      'latest_version': latest_version_str,
-                                      'current_version': setting.version_str})
+                               extra={'setting_name': setting.name, 'differences': response_data.get('differences'),
+                                      'latest_version': latest_version_str, 'current_version': setting.version_str})
             else:
                 logger.info('setting is outdated',
-                            extra={'setting_name': setting.name,
-                                   'differences': response_data.get('differences'),
-                                   'latest_version': latest_version_str,
-                                   'declared_version': setting.version_str})
-        elif outcome in ('created', 'uptodate', 'upgraded', 'mismatch', 'outofdate'):
+                            extra={'setting_name': setting.name, 'differences': response_data.get('differences'),
+                                   'latest_version': latest_version_str, 'declared_version': setting.version_str})
+            for difference in response_data.get('differences', ()):
+                apply_difference(setting, difference)
+        elif outcome in ('created', 'uptodate', 'upgraded', 'mismatch', 'outofdate', 'rejected'):
             # no special behaviour for these cases
             pass
         else:
             logger.warning('unexpected outcome from service', extra={'setting_name': setting.name, 'outcome': outcome})
 
-        for difference in response_data.get('differences', ()):
-            # right now we only know how to handle the 'default_value' attribute difference
-            attr = difference.get('attribute')
-            if attr == 'default_value':
-                server_default_value = difference.get('latest_value')
-                try:
-                    convert = setting.convert_server_value(server_default_value, None)
-                except TypeError:
-                    logger.warning('server default was discarded due to coercion error during declaration',
-                                   exc_info=True,
-                                   extra={'setting_name': setting.name, 'server_default_value': server_default_value})
-                else:
-                    if convert.coercions:
-                        logger.warning('server default was coerced to local value during declaration', extra={
-                            'setting_name': setting.name, 'server_default_value': server_default_value,
-                            'coercions': convert.coercions})
-                    setting.server_default_value = convert.value
         self._tracked_settings[setting.name] = setting
 
     def _update_settings_from_query(self, updated_settings: Mapping[str, dict]):
