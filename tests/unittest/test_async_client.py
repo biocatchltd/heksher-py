@@ -91,10 +91,10 @@ async def test_regular_update(fake_heksher_service, monkeypatch):
 async def test_heksher_unreachable(caplog):
     setting = Setting('cache_size', int, ['b', 'c'], 50)
     caplog.clear()
-    with assert_logs(caplog, ERROR):
-        with raises(HTTPError):
-            async with AsyncHeksherClient('http://notreal.fake.notreal', 10000000, ['a', 'b', 'c']):
-                assert setting.get(b='', c='') == 50
+    with assert_logs(caplog, ERROR), raises(HTTPError):
+        async with AsyncHeksherClient('http://notreal.fake.notreal', 10000000, ['a', 'b', 'c']):
+            pass
+    assert setting.get(b='', c='') == 50
 
 
 @atest

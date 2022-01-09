@@ -85,7 +85,8 @@ def test_heksher_unreachable(caplog):
 
     with assert_logs(caplog, ERROR):
         with ThreadHeksherClient('http://notreal.fake.notreal', 10000, ['a', 'b', 'c']):
-            assert setting.get(b='', c='') == 50
+            pass
+    assert setting.get(b='', c='') == 50
 
 
 def test_trackcontexts(fake_heksher_service, monkeypatch):
@@ -102,7 +103,6 @@ def test_trackcontexts(fake_heksher_service, monkeypatch):
             }
         }
     })), fake_heksher_service.query_rules.capture_calls() as query_calls:
-
         client = ThreadHeksherClient(fake_heksher_service.local_url(), 100000, ['a', 'b', 'c', 'd'])
         client.track_contexts(b='B', a=['a0', 'a1'], d=TRACK_ALL)
 

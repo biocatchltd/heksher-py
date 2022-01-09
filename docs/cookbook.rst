@@ -62,13 +62,12 @@ For this example, we'll create the option to override the heksher values with a 
             if options_file.is_file():
                 self.heksher_client = SyncStubHeksherClient()
                 options = json.loads(options_file.read_text())
-                self.heksher_client.patch(cache_size, options['cache_size'])
-                self.heksher_client.patch(cache_ttl, options['cache_ttl'])
-                self.heksher_client.patch(timeout, options['timeout'])
-                # note that we don't need to enter the patch contexts here, since we never intend to
-                # undo the patch
+                self.heksher_client[cache_size].rules = options['cache_size']
+                self.heksher_client[cache_ttl].rules = options['cache_ttl']
+                self.heksher_client[timeout].rules = options['timeout']
             else:
                 self.heksher_client = ThreadHeksherClient(...)
+                ...
 
             self.heksher_client.set_as_main()
 
