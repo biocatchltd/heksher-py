@@ -196,7 +196,7 @@ class V1APIClient(BaseHeksherClient, ABC):
             new_default = setting_results['default_value']
             try:
                 convert = setting.convert_server_value(new_default, None)
-            except TypeError as e:
+            except TypeError:
                 logger.warning('setting default value discarded default due to conversion error', exc_info=True,
                                extra={'setting_name': setting_name, 'new_default': new_default})
             else:
