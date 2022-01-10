@@ -1,4 +1,4 @@
-from logging import WARNING
+from logging import INFO
 
 from heksher.setting import Setting
 from tests.unittest.util import assert_logs
@@ -6,5 +6,5 @@ from tests.unittest.util import assert_logs
 
 def test_get_from_temp(caplog):
     a = Setting('a', int, 'abc', default_value=0)
-    with assert_logs(caplog, WARNING):
+    with assert_logs(caplog, INFO):
         assert a.get() == 0

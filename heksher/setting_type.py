@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import collections.abc
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from enum import Enum, IntFlag
 from logging import getLogger
 from types import MappingProxyType
-from typing import Any, Optional, Tuple, Type
+from typing import Any, Generic, Mapping, Optional, Sequence, Tuple, Type, TypeVar
 
 import orjson
 
@@ -26,8 +27,16 @@ except ImportError:
 
 logger = getLogger(__name__)
 
+T = TypeVar('T')
 
-class SettingType(ABC):
+
+@dataclass
+class Conversion(Generic[T]):
+    value: T
+    coercions: Sequence[str] = ()
+
+
+class SettingType(ABC, Generic[T]):
     """
     Base class for setting types
     """
@@ -40,7 +49,7 @@ class SettingType(ABC):
         pass
 
     @abstractmethod
-    def convert(self, x):
+    def convert(self, x) -> Conversion[T]:
         """
         Args:
             x: JSON-parsed value, retrieved from http api
@@ -53,27 +62,32 @@ class SettingType(ABC):
         """
         pass
 
+    def __eq__(self, other):
+        return isinstance(other, SettingType) and self.heksher_string() == other.heksher_string()
 
-class SimpleSettingType(SettingType):
+
+class SimpleSettingType(SettingType[T]):
     """
     A setting type for immutable primitives
     """
 
-    def __init__(self, name):
-        """
-        Args:
-            name: The name of the primitive in heksher specs
-        """
+    def __init__(self, name, acceptable_types: Tuple[type, ...]):
         self.name = name
+        self.type = acceptable_types
 
     def heksher_string(self) -> str:
         return self.name
 
     def convert(self, x):
-        return x
+        if not isinstance(x, self.type):
+            raise TypeError(f'value is not of type {self.type}')
+        return Conversion(x)
 
 
-class FlagsType(SettingType):
+F = TypeVar('F', bound=IntFlag)
+
+
+class HeksherFlags(SettingType[F]):
     """
     A setting type for flags, reflecting a flags of strings in heksher service.
     Notes:
@@ -81,7 +95,7 @@ class FlagsType(SettingType):
          member names.
     """
 
-    def __init__(self, flags_type: Type[IntFlag]):
+    def __init__(self, flags_type: Type[F]):
         """
         Args:
             flags_type: The IntFlags subclass to use as a type
@@ -91,113 +105,142 @@ class FlagsType(SettingType):
     def heksher_string(self) -> str:
         return 'Flags[' + ','.join(sorted(str(orjson.dumps(x), 'utf-8') for x in self.type_.__members__)) + ']'
 
-    def convert(self, x):
+    def convert(self, x) -> Conversion[F]:
         ret = self.type_(0)
+        coercions = []
         for i in x:
             if not isinstance(i, str):
                 raise TypeError(f'expected string in flags, got {type(i).__name__}')
             try:
                 member = self.type_[i]
             except KeyError:
-                logger.error('server sent a flag value not found in the python type',
-                             extra={'setting_type': self.heksher_string(), 'received value': i})
+                coercions.append(f'server sent a flag value not found in the python type ({i})')
             else:
                 ret |= member
-        return ret
+        return Conversion(ret, coercions)
 
 
-class EnumType(SettingType):
+E = TypeVar('E', bound=Enum)
+
+
+class HeksherEnum(SettingType[E]):
     """
     A setting type for an enum of primitive values
     """
 
-    def __init__(self, enum_type: Type[Enum]):
+    def __init__(self, enum_type: Type[E]):
         """
         Args:
             enum_type: The Enum subclass to use as a type
         """
         self.type_ = enum_type
+        for member in self.type_:
+            if type(member.value) not in (int, str, float, bool):
+                raise TypeError(f'enum member {member} has a non-primitive value of type')
 
     def heksher_string(self) -> str:
         return 'Enum[' + ','.join(sorted(str(orjson.dumps(x.value), 'utf-8') for x in self.type_)) + ']'
 
-    def convert(self, x):
-        return self.type_(x)
+    def convert(self, x) -> Conversion[E]:
+        try:
+            return Conversion(self.type_(x))
+        except ValueError as ve:
+            raise TypeError('value is not a valid enum member') from ve
 
 
-class GenericSequenceType(SettingType):
+class HeksherSequence(SettingType[Sequence[T]]):
     """
     A setting type for a sequence type
     """
 
-    def __init__(self, inner: SettingType):
+    def __init__(self, inner: SettingType[T]):
         """
         Args:
             inner: the inner setting type of each member
         """
-        self.inner = inner
+        self.inner = setting_type(inner)
 
     def heksher_string(self) -> str:
         return f'Sequence<{self.inner.heksher_string()}>'
 
-    def convert(self, x):
-        return tuple(self.inner.convert(i) for i in x)
+    def convert(self, x) -> Conversion[Sequence[T]]:
+        values = []
+        coercions = []
+        for i, v in enumerate(x):
+            try:
+                conversion = self.inner.convert(v)
+            except TypeError as e:
+                coercions.append(f'failed to convert element {i}: {e!r}')
+            else:
+                values.append(conversion.value)
+                coercions.extend(f'element {i}: {c}' for c in conversion.coercions)
+        return Conversion(tuple(values), coercions)
 
 
-class GenericMappingType(SettingType):
+class HeksherMapping(SettingType[Mapping[str, T]]):
     """
     A setting type for a mapping type with string keys
     """
 
-    def __init__(self, inner: SettingType):
+    def __init__(self, inner: SettingType[T]):
         """
         Args:
             inner: the inner setting type of each value in the
         """
-        self.inner = inner
+        self.inner = setting_type(inner)
 
     def heksher_string(self) -> str:
         return f'Mapping<{self.inner.heksher_string()}>'
 
-    def convert(self, x):
-        return MappingProxyType({k: self.inner.convert(v) for (k, v) in x.items()})
+    def convert(self, x) -> Conversion[Mapping[str, T]]:
+        values = {}
+        coercions = []
+        for k, v in x.items():
+            try:
+                conversion = self.inner.convert(v)
+            except TypeError as e:
+                coercions.append(f'failed to convert value for key {k}: {e!r}')
+            else:
+                values[k] = conversion.value
+                coercions.extend(f'{k}: {c}' for c in conversion.coercions)
+        return Conversion(MappingProxyType(values), coercions)
 
 
-_simples = {
-    int: SimpleSettingType('int'),
-    float: SimpleSettingType('float'),
-    str: SimpleSettingType('str'),
-    bool: SimpleSettingType('bool'),
+_simples: Mapping[type, SettingType] = {
+    int: SimpleSettingType('int', (int,)),
+    float: SimpleSettingType('float', (int, float)),
+    str: SimpleSettingType('str', (str,)),
+    bool: SimpleSettingType('bool', (bool,)),
 }
 
 
-def setting_type(py_type: Any) -> SettingType:
+def setting_type(arg: Any) -> SettingType:
     """
     Parse a python type to a heksher setting type
     Args:
-        py_type: the python type or genetic alias to parse
+        arg: the python type, genetic alias, or setting type to parse
 
     Returns:
-        A SettingType respective of py_type
+        A SettingType respective of arg
 
     """
-    if isinstance(py_type, type):
-        simple = _simples.get(py_type)
-        if simple:
-            return simple
-        if issubclass(py_type, IntFlag):
-            return FlagsType(py_type)
-        if issubclass(py_type, Enum):
-            return EnumType(py_type)
+    if isinstance(arg, SettingType):
+        return arg
+    simple = _simples.get(arg)
+    if simple:
+        return simple
+    if isinstance(arg, type):
+        if issubclass(arg, IntFlag):
+            return HeksherFlags(arg)
+        if issubclass(arg, Enum):
+            return HeksherEnum(arg)
     # we can't depend on GenericAlias to act the way we expect it to, we instead use get_origin and get_args
-    if get_origin(py_type) is collections.abc.Sequence:
-        arg, = get_args(py_type)
-        inner = setting_type(arg)
-        return GenericSequenceType(inner)
-    if get_origin(py_type) is collections.abc.Mapping:
-        key_type, value_type = get_args(py_type)
+    if get_origin(arg) is collections.abc.Sequence:
+        arg, = get_args(arg)
+        return HeksherSequence(setting_type(arg))
+    if get_origin(arg) is collections.abc.Mapping:
+        key_type, value_type = get_args(arg)
         if key_type is not str:
             raise TypeError('the key for mapping setting types must always be str')
-        inner = setting_type(value_type)
-        return GenericMappingType(inner)
-    raise RuntimeError(f'could not convert python value {py_type} to setting type')
+        return HeksherMapping(setting_type(value_type))
+    raise RuntimeError(f'could not convert value {arg} to setting type')

@@ -2,7 +2,7 @@ from logging import ERROR
 
 from pytest import mark, raises
 
-from heksher.clients.util import NO_DEFAULT, collate_rules
+from heksher.clients.util import collate_rules
 from tests.unittest.util import assert_logs
 
 
@@ -45,7 +45,7 @@ def test_collate_norules(features):
 
 
 def test_collate_norules_nocf():
-    assert collate_rules('', []) == NO_DEFAULT
+    assert collate_rules('', []) == {}
 
 
 def test_collate_cf_mismatch():

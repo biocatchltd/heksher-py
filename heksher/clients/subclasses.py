@@ -6,7 +6,8 @@ from abc import ABC, abstractmethod
 from contextvars import ContextVar
 from logging import getLogger
 from typing import (
-    AsyncContextManager, Collection, ContextManager, Iterable, Mapping, MutableMapping, Sequence, Tuple, TypeVar, Union
+    Any, AsyncContextManager, Collection, ContextManager, Iterable, Mapping, MutableMapping, Sequence, Tuple, TypeVar,
+    Union
 )
 from weakref import WeakValueDictionary
 
@@ -15,15 +16,33 @@ from ordered_set import OrderedSet
 from sortedcontainers import SortedDict, SortedList
 
 import heksher.main_client
-from heksher.clients.util import collate_rules
 from heksher.heksher_client import BaseHeksherClient, TemporaryClient
-from heksher.setting import RuleBranch, Setting
+from heksher.setting import QueriedRule, Setting
 
 logger = getLogger(__name__)
 
 T = TypeVar('T')
 
 TRACK_ALL = '*'
+
+
+def apply_difference(setting: Setting, difference: Mapping[str, Any]) -> None:
+    attr = difference.get('attribute')
+    # right now we only know how to handle the 'default_value' attribute difference
+    if attr == 'default_value':
+        server_default_value = difference.get('latest_value')
+        try:
+            convert = setting.convert_server_value(server_default_value, None)
+        except TypeError:
+            logger.warning('server default was discarded due to coercion error during declaration',
+                           exc_info=True,
+                           extra={'setting_name': setting.name, 'server_default_value': server_default_value})
+        else:
+            if convert.coercions:
+                logger.warning('server default was coerced to local value during declaration', extra={
+                    'setting_name': setting.name, 'server_default_value': server_default_value,
+                    'coercions': convert.coercions})
+            setting.server_default_value = convert.value
 
 
 class V1APIClient(BaseHeksherClient, ABC):
@@ -45,19 +64,6 @@ class V1APIClient(BaseHeksherClient, ABC):
         # the tracked options can also include the sentinel value TRACK_ALL
         # value will always be a set or TRACK_ALL, Literal is not supported in python 3.7
         self._tracked_settings: MutableMapping[str, Setting] = WeakValueDictionary()
-
-    def collate_rules(self, rules: Iterable[Tuple[Sequence[Tuple[str, str]], T]]) -> RuleBranch[T]:
-        """
-        Collate a list of rules, according to the client's context features
-
-        Args:
-            rules: an iterable of rules
-
-        Returns:
-            The root rule branch
-
-        """
-        return collate_rules(self._context_features, rules)
 
     def add_settings(self, settings: Iterable[Setting]):
         for s in settings:
@@ -108,17 +114,46 @@ class V1APIClient(BaseHeksherClient, ABC):
             response: the http response from the service
 
         """
-        response.raise_for_status()
-        response_data = response.json()
-        incomplete = response_data['incomplete']
-        if incomplete:
-            logger.warning('some setting entries are incomplete in declaration',
-                           extra={'setting': setting.name, 'incomplete': incomplete})
-        changed = response_data['changed']
-        if changed:
-            logger.warning('some setting entries were changed by declaration',
-                           extra={'setting': setting.name, 'changed': changed})
-        logger.info('setting declared', extra={'setting': setting.name})
+        if response.status_code == 409:
+            # we have encountered an upgrade conflict. We report it and attempt to cope
+            logger.error('conflict when declaring setting', extra={'setting_name': setting.name,
+                                                                   'response_content': response.content})
+        elif response.is_error:
+            logger.error('error when declaring setting', extra={'setting_name': setting.name,
+                                                                'response_content': response.content})
+        try:
+            response_data = response.json()
+        except ValueError:
+            # if the content is not json, it's probably an error response, do nothing (we already reported error
+            # responses)
+            if response.is_success:
+                logger.warning('unexpected response from service', extra={'response_content': response.content})
+            return
+
+        outcome = response_data.get('outcome')
+        if outcome == 'outdated':
+            latest_version_str = response_data.get('latest_version')
+            if latest_version_str is None:
+                logger.error('outdated setting without latest version', extra={'setting_name': setting.name})
+                latest_version: Tuple[int, int] = (float('inf'), float('inf'))  # type: ignore[assignment]
+            else:
+                latest_version = tuple(map(int, latest_version_str.split('.', 1)))  # type: ignore[assignment]
+            if latest_version[0] != setting.version[0]:
+                logger.warning('setting is outdated by a major version',
+                               extra={'setting_name': setting.name, 'differences': response_data.get('differences'),
+                                      'latest_version': latest_version_str, 'current_version': setting.version_str})
+            else:
+                logger.info('setting is outdated',
+                            extra={'setting_name': setting.name, 'differences': response_data.get('differences'),
+                                   'latest_version': latest_version_str, 'declared_version': setting.version_str})
+            for difference in response_data.get('differences', ()):
+                apply_difference(setting, difference)
+        elif outcome in ('created', 'uptodate', 'upgraded', 'mismatch', 'outofdate', 'rejected'):
+            # no special behaviour for these cases
+            pass
+        else:
+            logger.warning('unexpected outcome from service', extra={'setting_name': setting.name, 'outcome': outcome})
+
         self._tracked_settings[setting.name] = setting
 
     def _update_settings_from_query(self, updated_settings: Mapping[str, dict]):
@@ -128,10 +163,48 @@ class V1APIClient(BaseHeksherClient, ABC):
             updated_settings: A mapping of settings, with updated rules from the HTTP service
         """
         for setting_name, setting_results in updated_settings.items():
+            rejected_rules = []
+            coercions = []
             setting = self._tracked_settings[setting_name]
             rule_mappings = setting_results['rules']
-            rules = ((rm['context_features'], setting.type.convert(rm['value'])) for rm in rule_mappings)
-            setting.update(self, self._context_features, rules)
+            rules = []
+            for rule_mapping in rule_mappings:
+                context_features = rule_mapping['context_features']
+                cf_keys = frozenset(cf for (cf, _) in context_features)
+                unrecognized_cf = cf_keys - setting.configurable_features
+                if unrecognized_cf:
+                    rejected_rules.append(
+                        (rule_mapping['rule_id'], f'rule refers to unrecognized features {unrecognized_cf}'))
+                    continue
+                raw_value = rule_mapping['value']
+                rule = QueriedRule(rule_mapping['rule_id'], context_features)
+                try:
+                    conv = setting.convert_server_value(raw_value, rule)
+                except TypeError as e:
+                    rejected_rules.append((rule_mapping['rule_id'], f'rule value could not be converted: {e!r}'))
+                    continue
+                else:
+                    if conv.coercions:
+                        coercions.append((rule_mapping['rule_id'], conv.coercions))
+                    rules.append((conv.value, rule))
+            if rejected_rules:
+                logger.warning('setting update rejected rules', extra={'setting_name': setting_name,
+                                                                       'rejected_rules': rejected_rules})
+            if coercions:
+                logger.info('setting update coerced values', extra={'setting_name': setting_name,
+                                                                    'coercions': coercions})
+            new_default = setting_results['default_value']
+            try:
+                convert = setting.convert_server_value(new_default, None)
+            except TypeError:
+                logger.warning('setting default value discarded default due to conversion error', exc_info=True,
+                               extra={'setting_name': setting_name, 'new_default': new_default})
+            else:
+                if convert.coercions:
+                    logger.warning('setting default value coerced to local value', extra={
+                        'setting_name': setting_name, 'new_default': new_default, 'coercions': convert.coercions})
+                setting.server_default_value = convert.value
+            setting.update(self, rules)
 
     def context_namespace(self, user_namespace: Mapping[str, str]) -> Mapping[str, str]:
         redundant_keys = user_namespace.keys() - self._context_features

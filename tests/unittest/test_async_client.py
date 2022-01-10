@@ -26,14 +26,14 @@ async def test_init_works(fake_heksher_service, monkeypatch):
 async def test_declare_before_main(fake_heksher_service, monkeypatch):
     monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b', 'c'])
     monkeypatch.setitem(fake_heksher_service.declare_responses, 'cache_size', {
-        'created': True, 'changed': [], 'incomplete': {}
+        'outcome': 'created'
     })
 
     setting = Setting('cache_size', int, ['b', 'c'], 50)
     with fake_heksher_service.query_rules.patch(JSONResponse({
         'settings': {
             'cache_size': {
-                'rules': [{'context_features': [], 'value': 100}]
+                'rules': [{'context_features': [], 'value': 100, 'rule_id': 1}], 'default_value': 100
             }
         }
     })):
@@ -45,7 +45,7 @@ async def test_declare_before_main(fake_heksher_service, monkeypatch):
 async def test_declare_after_main(fake_heksher_service, monkeypatch):
     monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b', 'c'])
     monkeypatch.setitem(fake_heksher_service.declare_responses, 'cache_size', {
-        'created': True, 'changed': [], 'incomplete': {}
+        'outcome': 'created'
     })
 
     async with AsyncHeksherClient(fake_heksher_service.local_url(), 10000000, ['a', 'b', 'c']) as client:
@@ -57,7 +57,7 @@ async def test_declare_after_main(fake_heksher_service, monkeypatch):
         with fake_heksher_service.query_rules.patch(JSONResponse({
             'settings': {
                 'cache_size': {
-                    'rules': [{'context_features': [], 'value': 100}]
+                    'rules': [{'context_features': [], 'value': 100, 'rule_id': 1}], 'default_value': 100
                 }
             }
         })):
@@ -69,7 +69,7 @@ async def test_declare_after_main(fake_heksher_service, monkeypatch):
 async def test_regular_update(fake_heksher_service, monkeypatch):
     monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b', 'c'])
     monkeypatch.setitem(fake_heksher_service.declare_responses, 'cache_size', {
-        'created': True, 'changed': [], 'incomplete': {}
+        'outcome': 'created'
     })
 
     setting = Setting('cache_size', int, ['b', 'c'], 50)
@@ -79,7 +79,7 @@ async def test_regular_update(fake_heksher_service, monkeypatch):
         with fake_heksher_service.query_rules.patch(JSONResponse({
             'settings': {
                 'cache_size': {
-                    'rules': [{'context_features': [], 'value': 100}]
+                    'rules': [{'context_features': [], 'value': 100, 'rule_id': 1}], 'default_value': 100
                 }
             }
         })):
@@ -91,9 +91,10 @@ async def test_regular_update(fake_heksher_service, monkeypatch):
 async def test_heksher_unreachable(caplog):
     setting = Setting('cache_size', int, ['b', 'c'], 50)
     caplog.clear()
-    with assert_logs(caplog, ERROR):
+    with assert_logs(caplog, ERROR), raises(HTTPError):
         async with AsyncHeksherClient('http://notreal.fake.notreal', 10000000, ['a', 'b', 'c']):
-            assert setting.get(b='', c='') == 50
+            pass
+    assert setting.get(b='', c='') == 50
 
 
 @atest
@@ -109,21 +110,21 @@ async def test_cf_mismatch(fake_heksher_service, caplog, monkeypatch, expected):
 
     with assert_logs(caplog, WARNING):
         async with AsyncHeksherClient(fake_heksher_service.local_url(), 1000, expected) as client:
-            assert client._context_features == ['a', 'b', 'c']
+            assert client._context_features == expected
 
 
 @atest
 async def test_redundant_defaults(fake_heksher_service, caplog, monkeypatch):
     monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b', 'c'])
     monkeypatch.setitem(fake_heksher_service.declare_responses, 'cache_size', {
-        'created': True, 'changed': [], 'incomplete': {}
+        'outcome': 'created'
     })
 
     setting = Setting('cache_size', int, ['b', 'c'], 50)
     with fake_heksher_service.query_rules.patch(JSONResponse({
         'settings': {
             'cache_size': {
-                'rules': [{'context_features': [['b', 'B']], 'value': 100}]
+                'rules': [{'context_features': [['b', 'B']], 'value': 100, 'rule_id': 1}], 'default_value': 100
             }
         }
     })):
@@ -137,14 +138,14 @@ async def test_redundant_defaults(fake_heksher_service, caplog, monkeypatch):
 async def test_trackcontexts(fake_heksher_service, monkeypatch):
     monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b', 'c', 'd'])
     monkeypatch.setitem(fake_heksher_service.declare_responses, 'cache_size', {
-        'created': True, 'changed': [], 'incomplete': {}
+        'outcome': 'created'
     })
 
     setting = Setting('cache_size', int, ['b', 'c'], 50)
     with fake_heksher_service.query_rules.patch(JSONResponse({
         'settings': {
             'cache_size': {
-                'rules': [{'context_features': [['b', 'B']], 'value': 100}]
+                'rules': [{'context_features': [['b', 'B']], 'value': 100, 'rule_id': 1}], 'default_value': 100
             }
         }
     })), fake_heksher_service.query_rules.capture_calls() as query_calls:
@@ -184,15 +185,12 @@ async def test_bad_tracking_all_second(caplog):
 
 
 @atest
-@mark.parametrize('changed,incomplete', [
-    (['x', 'y'], {}),
-    ([], {'a': 'b'}),
-    (['x', 'y'], {'a': 'b'}),
-])
-async def test_incomplete_declaration(fake_heksher_service, monkeypatch, changed, incomplete, caplog):
+async def test_outdated_declaration(fake_heksher_service, monkeypatch, caplog):
     monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b', 'c'])
     monkeypatch.setitem(fake_heksher_service.declare_responses, 'cache_size', {
-        'created': True, 'changed': changed, 'incomplete': incomplete
+        'outcome': 'outdated',
+        'latest_version': '2.0',
+        'differences': []
     })
 
     setting = Setting('cache_size', int, ['b', 'c'], 50)
@@ -203,10 +201,45 @@ async def test_incomplete_declaration(fake_heksher_service, monkeypatch, changed
 
 
 @atest
+async def test_outdated_declaration_different_default(fake_heksher_service, monkeypatch, caplog):
+    monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b', 'c'])
+    monkeypatch.setitem(fake_heksher_service.declare_responses, 'cache_size', {
+        'outcome': 'outdated',
+        'latest_version': '2.0',
+        'differences': [
+            {'level': 'minor', 'attribute': 'default_value', 'latest_value': 100}
+        ]
+    })
+
+    setting = Setting('cache_size', int, ['b', 'c'], 50)
+
+    with assert_logs(caplog, WARNING):
+        async with AsyncHeksherClient(fake_heksher_service.local_url(), 10000000, ['a', 'b', 'c']):
+            assert setting.get(b='', c='') == 100
+
+
+@atest
+async def test_upgraded_declaration_different_default(fake_heksher_service, monkeypatch, caplog):
+    monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b', 'c'])
+    monkeypatch.setitem(fake_heksher_service.declare_responses, 'cache_size', {
+        'outcome': 'upgraded',
+        'latest_version': '0.5',
+        'differences': [
+            {'level': 'minor', 'attribute': 'default_value', 'latest_value': 100}
+        ]
+    })
+
+    setting = Setting('cache_size', int, ['b', 'c'], 50)
+
+    async with AsyncHeksherClient(fake_heksher_service.local_url(), 10000000, ['a', 'b', 'c']):
+        assert setting.get(b='', c='') == 50
+
+
+@atest
 async def test_flags_setting(fake_heksher_service, monkeypatch):
     monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b', 'c'])
     monkeypatch.setitem(fake_heksher_service.declare_responses, 'c', {
-        'created': True, 'changed': [], 'incomplete': {}
+        'outcome': 'created'
     })
 
     class Color(IntFlag):
@@ -218,12 +251,150 @@ async def test_flags_setting(fake_heksher_service, monkeypatch):
     with fake_heksher_service.query_rules.patch(JSONResponse({
         'settings': {
             'c': {
-                'rules': [{'context_features': [], 'value': ['green', 'blue']}]
+                'rules': [{'context_features': [], 'value': ['green', 'blue'], 'rule_id': 1}],
+                'default_value': []
             }
         }
     })):
         async with AsyncHeksherClient(fake_heksher_service.local_url(), 1000, ['a', 'b', 'c']):
             assert c.get(a='', b='', c='') == Color.green | Color.blue
+
+
+@atest
+async def test_flags_setting_coerce(fake_heksher_service, monkeypatch, caplog):
+    monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b', 'c'])
+    monkeypatch.setitem(fake_heksher_service.declare_responses, 'c', {
+        'outcome': 'created'
+    })
+
+    class Color(IntFlag):
+        blue = auto()
+        red = auto()
+        green = auto()
+
+    c = Setting('c', Color, 'abc', default_value=Color(0))
+    with fake_heksher_service.query_rules.patch(JSONResponse({
+        'settings': {
+            'c': {
+                'rules': [{'context_features': [], 'value': ['green', 'blue', 'white'], 'rule_id': 1}],
+                'default_value': []
+            }
+        }
+    })):
+        caplog.clear()
+        with assert_logs(caplog, WARNING):
+            async with AsyncHeksherClient(fake_heksher_service.local_url(), 1000, ['a', 'b', 'c']):
+                assert c.get(a='', b='', c='') == Color.green | Color.blue
+
+
+@atest
+async def test_flags_setting_coerce_default(fake_heksher_service, monkeypatch, caplog):
+    monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b', 'c'])
+    monkeypatch.setitem(fake_heksher_service.declare_responses, 'c', {
+        'outcome': 'created'
+    })
+
+    class Color(IntFlag):
+        blue = auto()
+        red = auto()
+        green = auto()
+
+    c = Setting('c', Color, 'abc', default_value=Color(0))
+    with fake_heksher_service.query_rules.patch(JSONResponse({
+        'settings': {
+            'c': {
+                'rules': [{'context_features': [['a', 'f']], 'value': ['green', 'blue'], 'rule_id': 1}],
+                'default_value': ['white', 'blue']
+            }
+        }
+    })):
+        caplog.clear()
+        with assert_logs(caplog, WARNING):
+            async with AsyncHeksherClient(fake_heksher_service.local_url(), 1000, ['a', 'b', 'c']):
+                assert c.get(a='re', b='', c='') == Color.blue
+
+
+@atest
+async def test_flags_setting_reject_value(fake_heksher_service, monkeypatch, caplog):
+    monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b', 'c'])
+    monkeypatch.setitem(fake_heksher_service.declare_responses, 'c', {
+        'outcome': 'created'
+    })
+
+    class Color(IntFlag):
+        blue = auto()
+        red = auto()
+        green = auto()
+
+    c = Setting('c', Color, 'abc', default_value=Color(0))
+    with fake_heksher_service.query_rules.patch(JSONResponse({
+        'settings': {
+            'c': {
+                'rules': [{'context_features': [['a', 'x']], 'value': ['green', 'blue'], 'rule_id': 1},
+                          {'context_features': [['a', 'y']], 'value': ['green', 'blue', ['abc']], 'rule_id': 2}],
+                'default_value': []
+            }
+        }
+    })):
+        caplog.clear()
+        with assert_logs(caplog, WARNING):
+            async with AsyncHeksherClient(fake_heksher_service.local_url(), 1000, ['a', 'b', 'c']):
+                assert c.get(a='x', b='', c='') == Color.green | Color.blue
+
+
+@atest
+async def test_flags_setting_reject_default(fake_heksher_service, monkeypatch, caplog):
+    monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b', 'c'])
+    monkeypatch.setitem(fake_heksher_service.declare_responses, 'c', {
+        'outcome': 'created'
+    })
+
+    class Color(IntFlag):
+        blue = auto()
+        red = auto()
+        green = auto()
+
+    c = Setting('c', Color, 'abc', default_value=Color(0))
+    with fake_heksher_service.query_rules.patch(JSONResponse({
+        'settings': {
+            'c': {
+                'rules': [{'context_features': [['a', 'f']], 'value': ['green', 'blue'], 'rule_id': 1}],
+                'default_value': [['blank']]
+            }
+        }
+    })):
+        caplog.clear()
+        with assert_logs(caplog, WARNING):
+            async with AsyncHeksherClient(fake_heksher_service.local_url(), 1000, ['a', 'b', 'c']):
+                assert c.get(a='re', b='', c='') == Color(0)
+
+
+@atest
+async def test_flags_setting_reject_context(fake_heksher_service, monkeypatch, caplog):
+    monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b', 'c'])
+    monkeypatch.setitem(fake_heksher_service.declare_responses, 'c', {
+        'outcome': 'created'
+    })
+
+    class Color(IntFlag):
+        blue = auto()
+        red = auto()
+        green = auto()
+
+    c = Setting('c', Color, 'abc', default_value=Color(0))
+    with fake_heksher_service.query_rules.patch(JSONResponse({
+        'settings': {
+            'c': {
+                'rules': [{'context_features': [['a', 'x'], ['z', 'foo']], 'value': ['green', 'red'], 'rule_id': 1},
+                          {'context_features': [['a', 'x']], 'value': ['green', 'blue'], 'rule_id': 2}],
+                'default_value': []
+            }
+        }
+    })):
+        caplog.clear()
+        with assert_logs(caplog, WARNING):
+            async with AsyncHeksherClient(fake_heksher_service.local_url(), 1000, ['a', 'b', 'c']):
+                assert c.get(a='x', b='', c='') == Color.green | Color.blue
 
 
 @atest
@@ -259,7 +430,9 @@ async def test_get_settings(fake_heksher_service, monkeypatch):
             'configurable_features': ['a', 'b'],
             'type': 'int',
             'default_value': None,
-            'metadata': {}
+            'metadata': {},
+            'aliases': [],
+            'version': '1.0',
         }
     ]}
     with fake_heksher_service.get_settings.patch(JSONResponse(settings)):
@@ -269,18 +442,17 @@ async def test_get_settings(fake_heksher_service, monkeypatch):
                                                    configurable_features=['a', 'b'],
                                                    type='int',
                                                    default_value=None,
-                                                   metadata={})
-                                }
+                                                   metadata={}, aliases=[], version='1.0')}
 
 
 @atest
 async def test_switch_main_from_temp(fake_heksher_service, monkeypatch):
     monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b'])
     monkeypatch.setitem(fake_heksher_service.declare_responses, 'conf1', {
-        'created': True, 'changed': [], 'incomplete': {}
+        'outcome': 'created'
     })
     monkeypatch.setitem(fake_heksher_service.declare_responses, 'conf2', {
-        'created': True, 'changed': [], 'incomplete': {}
+        'outcome': 'created'
     })
     setting1 = Setting('conf1', int, ['a'], 74)
     client = AsyncHeksherClient(fake_heksher_service.local_url(), 10000000, ['a', 'b'])
@@ -290,10 +462,12 @@ async def test_switch_main_from_temp(fake_heksher_service, monkeypatch):
     with fake_heksher_service.query_rules.patch(JSONResponse({
         'settings': {
             'conf1': {
-                'rules': [{'context_features': [], 'value': 5}]
+                'rules': [{'context_features': [], 'value': 5, 'rule_id': 1}],
+                'default_value': 74
             },
             'conf2': {
-                'rules': [{'context_features': [], 'value': 4}]
+                'rules': [{'context_features': [], 'value': 4, 'rule_id': 2}],
+                'default_value': 26
             }
         }
     })):
@@ -307,13 +481,13 @@ async def test_switch_main_from_temp(fake_heksher_service, monkeypatch):
 async def test_switch_main(fake_heksher_service, monkeypatch, caplog):
     monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b'])
     monkeypatch.setitem(fake_heksher_service.declare_responses, 'conf1', {
-        'created': True, 'changed': [], 'incomplete': {}
+        'outcome': 'created'
     })
     monkeypatch.setitem(fake_heksher_service.declare_responses, 'conf2', {
-        'created': True, 'changed': [], 'incomplete': {}
+        'outcome': 'created'
     })
     monkeypatch.setitem(fake_heksher_service.declare_responses, 'conf3', {
-        'created': True, 'changed': [], 'incomplete': {}
+        'outcome': 'created'
     })
     setting1 = Setting('conf1', int, ['a'], 74)
     client1 = AsyncHeksherClient(fake_heksher_service.local_url(), 10000000, ['a', 'b'])
@@ -323,10 +497,12 @@ async def test_switch_main(fake_heksher_service, monkeypatch, caplog):
     with fake_heksher_service.query_rules.patch(JSONResponse({
         'settings': {
             'conf1': {
-                'rules': [{'context_features': [], 'value': 5}]
+                'rules': [{'context_features': [], 'value': 5, 'rule_id': 1}],
+                'default_value': 74
             },
             'conf2': {
-                'rules': [{'context_features': [], 'value': 4}]
+                'rules': [{'context_features': [], 'value': 4, 'rule_id': 2}],
+                'default_value': 26
             }
         }
     })):
@@ -343,13 +519,16 @@ async def test_switch_main(fake_heksher_service, monkeypatch, caplog):
     with fake_heksher_service.query_rules.patch(JSONResponse({
         'settings': {
             'conf1': {
-                'rules': [{'context_features': [], 'value': 5}]
+                'rules': [{'context_features': [], 'value': 5, 'rule_id': 1}],
+                'default_value': 74
             },
             'conf2': {
-                'rules': [{'context_features': [], 'value': 4}]
+                'rules': [{'context_features': [], 'value': 4, 'rule_id': 2}],
+                'default_value': 26
             },
             'conf3': {
-                'rules': [{'context_features': [], 'value': 3}]
+                'rules': [{'context_features': [], 'value': 3, 'rule_id': 3}],
+                'default_value': 59
             }
         }
     })):
@@ -364,13 +543,13 @@ async def test_switch_main(fake_heksher_service, monkeypatch, caplog):
 async def test_switch_main_different_tracking(fake_heksher_service, monkeypatch, caplog):
     monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b'])
     monkeypatch.setitem(fake_heksher_service.declare_responses, 'conf1', {
-        'created': True, 'changed': [], 'incomplete': {}
+        'outcome': 'created'
     })
     monkeypatch.setitem(fake_heksher_service.declare_responses, 'conf2', {
-        'created': True, 'changed': [], 'incomplete': {}
+        'outcome': 'created'
     })
     monkeypatch.setitem(fake_heksher_service.declare_responses, 'conf3', {
-        'created': True, 'changed': [], 'incomplete': {}
+        'outcome': 'created'
     })
     setting1 = Setting('conf1', int, ['a'], 74)
     client1 = AsyncHeksherClient(fake_heksher_service.local_url(), 10000000, ['a', 'b'])
@@ -380,10 +559,12 @@ async def test_switch_main_different_tracking(fake_heksher_service, monkeypatch,
     with fake_heksher_service.query_rules.patch(JSONResponse({
         'settings': {
             'conf1': {
-                'rules': [{'context_features': [], 'value': 5}]
+                'rules': [{'context_features': [], 'value': 5, 'rule_id': 1}],
+                'default_value': 74
             },
             'conf2': {
-                'rules': [{'context_features': [], 'value': 4}]
+                'rules': [{'context_features': [], 'value': 4, 'rule_id': 2}],
+                'default_value': 26
             }
         }
     })):
@@ -400,13 +581,16 @@ async def test_switch_main_different_tracking(fake_heksher_service, monkeypatch,
     with fake_heksher_service.query_rules.patch(JSONResponse({
         'settings': {
             'conf1': {
-                'rules': [{'context_features': [], 'value': 5}]
+                'rules': [{'context_features': [], 'value': 5, 'rule_id': 1}],
+                'default_value': 74,
             },
             'conf2': {
-                'rules': [{'context_features': [], 'value': 4}]
+                'rules': [{'context_features': [], 'value': 4, 'rule_id': 2}],
+                'default_value': 26,
             },
             'conf3': {
-                'rules': [{'context_features': [], 'value': 3}]
+                'rules': [{'context_features': [], 'value': 3, 'rule_id': 3}],
+                'default_value': 59,
             }
         }
     })):
@@ -421,13 +605,13 @@ async def test_switch_main_different_tracking(fake_heksher_service, monkeypatch,
 async def test_switch_main_different_contexts(fake_heksher_service, monkeypatch):
     monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b', 'c'])
     monkeypatch.setitem(fake_heksher_service.declare_responses, 'conf1', {
-        'created': True, 'changed': [], 'incomplete': {}
+        'outcome': 'created'
     })
     monkeypatch.setitem(fake_heksher_service.declare_responses, 'conf2', {
-        'created': True, 'changed': [], 'incomplete': {}
+        'outcome': 'created'
     })
     monkeypatch.setitem(fake_heksher_service.declare_responses, 'conf3', {
-        'created': True, 'changed': [], 'incomplete': {}
+        'outcome': 'created'
     })
     setting1 = Setting('conf1', int, ['a'], 74)
     client1 = AsyncHeksherClient(fake_heksher_service.local_url(), 10000000, ['a', 'b'])
@@ -437,10 +621,12 @@ async def test_switch_main_different_contexts(fake_heksher_service, monkeypatch)
     with fake_heksher_service.query_rules.patch(JSONResponse({
         'settings': {
             'conf1': {
-                'rules': [{'context_features': [], 'value': 5}]
+                'rules': [{'context_features': [], 'value': 5, 'rule_id': 1}],
+                'default_value': 74
             },
             'conf2': {
-                'rules': [{'context_features': [], 'value': 4}]
+                'rules': [{'context_features': [], 'value': 4, 'rule_id': 2}],
+                'default_value': 26
             }
         }
     })):
@@ -460,13 +646,13 @@ async def test_switch_main_different_contexts(fake_heksher_service, monkeypatch)
 async def test_switch_main_unclosed(fake_heksher_service, monkeypatch):
     monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b'])
     monkeypatch.setitem(fake_heksher_service.declare_responses, 'conf1', {
-        'created': True, 'changed': [], 'incomplete': {}
+        'outcome': 'created'
     })
     monkeypatch.setitem(fake_heksher_service.declare_responses, 'conf2', {
-        'created': True, 'changed': [], 'incomplete': {}
+        'outcome': 'created'
     })
     monkeypatch.setitem(fake_heksher_service.declare_responses, 'conf3', {
-        'created': True, 'changed': [], 'incomplete': {}
+        'outcome': 'created'
     })
     setting1 = Setting('conf1', int, ['a'], 74)
     client1 = AsyncHeksherClient(fake_heksher_service.local_url(), 10000000, ['a', 'b'])
@@ -479,3 +665,53 @@ async def test_switch_main_unclosed(fake_heksher_service, monkeypatch):
     with raises(RuntimeError):  # not allowed
         await client2.set_as_main()
     await client2.close()
+
+
+@atest
+async def test_no_rules(fake_heksher_service, monkeypatch):
+    monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b', 'c'])
+    monkeypatch.setitem(fake_heksher_service.declare_responses, 'cache_size', {
+        'outcome': 'created'
+    })
+
+    setting = Setting('cache_size', int, ['b', 'c'], 50)
+    with fake_heksher_service.query_rules.patch(JSONResponse({
+        'settings': {
+            'cache_size': {
+                'rules': [], 'default_value': 100
+            }
+        }
+    })):
+        async with AsyncHeksherClient(fake_heksher_service.local_url(), 10000000, ['a', 'b', 'c']):
+            assert setting.get(b='', c='') == 100
+
+
+@atest
+async def test_flags_setting_validator(fake_heksher_service, monkeypatch):
+    monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b', 'c'])
+    monkeypatch.setitem(fake_heksher_service.declare_responses, 'c', {
+        'outcome': 'created'
+    })
+
+    class Color(IntFlag):
+        blue = auto()
+        red = auto()
+        green = auto()
+
+    c = Setting('c', Color, 'abc', default_value=Color(0))
+
+    @c.add_validator
+    def add_red(value, *_):
+        return value | Color.red
+
+    with fake_heksher_service.query_rules.patch(JSONResponse({
+        'settings': {
+            'c': {
+                'rules': [{'context_features': [['a', 'x']], 'value': ['green', 'blue'], 'rule_id': 1}],
+                'default_value': []
+            }
+        }
+    })):
+        async with AsyncHeksherClient(fake_heksher_service.local_url(), 1000, ['a', 'b', 'c']):
+            assert c.get(a='x', b='', c='') == Color.green | Color.blue | Color.red
+            assert c.get(a='y', b='', c='') == Color.red

@@ -13,7 +13,6 @@ Clients- Heksher clients
         `async HTTPX client <https://www.python-httpx.org/async/>`_.
 
 
-
     .. method:: set_as_main()
         :async:
 
@@ -21,6 +20,12 @@ Clients- Heksher clients
         then will wait for an initial update.
 
         If the client is used as an async context manager, this method will be called on entry.
+
+        If an error occurs during the declarations or the initial update, the exception will be raised.
+
+        .. warning::
+            If an error occurs in the update or declarations loops after the method returned, the exception will not be
+            raised, instead the exception will be logged.
 
         .. code-block:: python
 
@@ -39,6 +44,8 @@ Clients- Heksher clients
 
         Updates all setting rules. This occurs automatically every ``update_interval`` seconds after :meth:`set_as_main`
         is called, but calling this method will perform a manual reload. Will also reset the update timer.
+
+        If an error occurs during the update, the exception will be raised.
 
     .. attribute:: modification_lock
         :type: asyncio.Lock
@@ -80,6 +87,8 @@ Clients- Heksher clients
         * ``type`` (:class:`str`): The type of the setting by Heksher specs.
         * ``default_value`` (Any): The default value of the setting.
         * ``metadata`` (:class:`dict`\[:class:`str`, Any\]): The metadata of the setting.
+        * ``aliases`` (:class:`list`\[:class:`str`\]): The aliases of the setting.
+        * ``version`` (:class:`str`): The version of the setting's latest declaration.
 
 
     .. method:: track_contexts(**context_values: str | collections.abc.Collection[str])
@@ -98,6 +107,10 @@ Clients- Heksher clients
             context_features: collections.abc.Sequence[str], *, http_client_args: dict[str, ...] = None)
 
     A synchronous client for Heksher. Updates and declares settings in the background using a separate thread.
+
+    .. warning::
+        Since the declarations and updates are performed in a separate thread, any errors that occur during these
+        operations will not be raised. Instead, the error will be logged.
 
     :param service_url: The URL of the Heksher service.
     :param update_interval: The interval in seconds between updates.
@@ -166,6 +179,8 @@ Clients- Heksher clients
         * ``type`` (:class:`str`): The type of the setting by Heksher specs.
         * ``default_value`` (Any): The default value of the setting.
         * ``metadata`` (:class:`dict`\[:class:`str`, Any\]): The metadata of the setting.
+        * ``aliases`` (:class:`list`\[:class:`str`\]): The aliases of the setting.
+        * ``version`` (:class:`str`): The version of the setting's latest declaration.
 
 
     .. method:: track_contexts(**context_values: str | collections.abc.Collection[str])
