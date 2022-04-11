@@ -33,7 +33,7 @@ async def test_declare_before_main(fake_heksher_service, monkeypatch):
     with fake_heksher_service.query_rules.patch(JSONResponse({
         'settings': {
             'cache_size': {
-                'rules': [{'context_features': [], 'value': 100, 'rule_id': 1}], 'default_value': 100
+                'rules': [{'context_features': [['b', '0']], 'value': 100, 'rule_id': 1}], 'default_value': 50
             }
         }
     })):
