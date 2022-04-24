@@ -18,6 +18,7 @@ mock = {version="^4.0.0", markers = "python_version < '3.8'"}
 ordered-set = "^4.0.0"
 pydantic = "^1.0.0"
 sortedcontainers = "^2.4.0"
+Deprecated = ">=1.2.13"
 
 [tool.poetry.dev-dependencies]
 pytest = "*"

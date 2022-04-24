@@ -14,6 +14,7 @@ from weakref import WeakValueDictionary
 from httpx import Response
 from ordered_set import OrderedSet
 from sortedcontainers import SortedDict, SortedList
+from deprecated import deprecated
 
 import heksher.main_client
 from heksher.heksher_client import BaseHeksherClient, TemporaryClient
@@ -326,8 +327,12 @@ class AsyncContextManagerMixin(BaseHeksherClient, AsyncContextManager):
     async def set_as_main(self):
         self._set_as_main()
 
-    @abstractmethod
+    @deprecated(version="0.2.0", reason="use aclose() instead")
     async def close(self):
+        return await self.aclose()
+
+    @abstractmethod
+    async def aclose(self):
         pass
 
     async def __aenter__(self):
@@ -335,4 +340,4 @@ class AsyncContextManagerMixin(BaseHeksherClient, AsyncContextManager):
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.close()
+        await self.aclose()

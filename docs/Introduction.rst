@@ -58,7 +58,7 @@ its HTTP API. heksher-py supports both asynchronous and synchronous clients that
 
         async def shutdown(self):
             ...
-            await self.heksher_client.close() # will stop the background update task
+            await self.heksher_client.aclose() # will stop the background update task
             ...
 
         def get_cache_ttl(self, user):
