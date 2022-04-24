@@ -11,6 +11,7 @@ from typing import (
 )
 from weakref import WeakValueDictionary
 
+from deprecated import deprecated
 from httpx import Response
 from ordered_set import OrderedSet
 from sortedcontainers import SortedDict, SortedList
@@ -50,7 +51,6 @@ class V1APIClient(BaseHeksherClient, ABC):
     A client base class with shared logic for heksher's v1 HTTP API.
     """
     _undeclared: Union[asyncio.Queue, queue.Queue]
-    _context_features: OrderedSet[str]
 
     def __init__(self, context_features: Sequence[str]):
         """
@@ -261,7 +261,6 @@ class ContextFeaturesMixin(BaseHeksherClient, ABC):
     """
     A mixin class to handle default context feature values, either from contextvars or string constants.
     """
-    _context_features: Collection[str]
 
     def __init__(self):
         super().__init__()
@@ -326,8 +325,12 @@ class AsyncContextManagerMixin(BaseHeksherClient, AsyncContextManager):
     async def set_as_main(self):
         self._set_as_main()
 
-    @abstractmethod
+    @deprecated(version="0.2.0", reason="use aclose() instead")
     async def close(self):
+        return await self.aclose()
+
+    @abstractmethod
+    async def aclose(self):
         pass
 
     async def __aenter__(self):
@@ -335,4 +338,4 @@ class AsyncContextManagerMixin(BaseHeksherClient, AsyncContextManager):
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.close()
+        await self.aclose()

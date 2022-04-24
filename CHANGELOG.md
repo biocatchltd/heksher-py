@@ -10,6 +10,8 @@ This version is only compatible with heksher 0.5.0 and above.
 * client.get_settings() also includes the setting's version and alias
 * setting.on_coerce, a callable to use if value coercion occurs.
 * type coercion and rejection is now supported
+* added overridable callback methods ```on_update_error``` and ```on_update_success``` to Async and
+  Thread clients.
 ### Removed
 * stub rules no longer accept `None` feature values
 ### Changed
@@ -24,6 +26,7 @@ This version is only compatible with heksher 0.5.0 and above.
 * Creating settings with an alias type, enum type, or flags type is deprecated. use HeksherEnum, HeksherFlags, 
   HeksherMapping, or HeksherSequence instead.
 * using ``patch`` for stub clients is now deprecated. Prefer to set the ``rules`` attribute instead.
+* ``AsyncContextManagerMixin.close`` is now deprecated. Use ``AsyncContextManagerMixin.aclose`` instead.
 ### 0.1.5
 ### Added
 * Added add_validator method for Setting; Validators added to each Setting will be called by order they were added 

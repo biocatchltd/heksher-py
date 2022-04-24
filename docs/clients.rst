@@ -32,12 +32,20 @@ Clients- Heksher clients
             async with AsyncHeksherClient(...) as client:
                 ...
 
-    .. method:: close()
+    .. method:: aclose()
         :async:
 
         Closes the client. This will cancel all pending tasks.
 
         If the client is used as an async context manager, this method will be called on exit.
+
+    .. method:: close()
+        :async:
+
+        .. deprecated:: 0.2.0
+            Use :meth:`aclose` instead.
+
+        Legacy alias for :meth:`aclose`.
 
     .. method:: reload()
         :async:
@@ -101,6 +109,19 @@ Clients- Heksher clients
         or the value may be a collection of strings, in which case the context feature will be tracked with all of the
         strings as its value. Alternatively, a value may be the constant :data:`TRACK_ALL`, in which case all values of
         the context feature will be tracked.
+
+    .. method:: on_update_error(exc: Exception)->None
+
+        Called when an error occurs during a rule update. Override this method to add special error
+        handling.
+
+        :param exc: The exception that occurred.
+
+
+    .. method:: on_update_ok()->None
+
+        Called when a rule update completed successfully (including when no change is necessary).
+        Override this method to add a callback on successful updates.
 
 
 .. class:: ThreadHeksherClient(service_url: str, update_interval: int,\
@@ -193,3 +214,16 @@ Clients- Heksher clients
         or the value may be a collection of strings, in which case the context feature will be tracked with all of the
         strings as its value. Alternatively, a value may be the constant :data:`TRACK_ALL`, in which case all values of
         the context feature will be tracked.
+
+    .. method:: on_update_error(exc: Exception)->None
+
+        Called when an error occurs during a rule update. Override this method to add special error
+        handling.
+
+        :param exc: The exception that occurred.
+
+
+    .. method:: on_update_ok()->None
+
+        Called when a rule update completed successfully (including when no change is necessary).
+        Override this method to add a callback on successful updates.

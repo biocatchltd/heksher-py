@@ -401,7 +401,7 @@ async def test_flags_setting_reject_context(fake_heksher_service, monkeypatch, c
 async def test_health_OK(fake_heksher_service):
     client = AsyncHeksherClient(fake_heksher_service.local_url(), 1000, ['a', 'b', 'c'])
     await client.ping()
-    await client.close()
+    await client.aclose()
 
 
 @atest
@@ -410,7 +410,7 @@ async def test_health_err(fake_heksher_service, monkeypatch):
         client = AsyncHeksherClient(fake_heksher_service.local_url(), 1000, ['a', 'b', 'c'])
         with raises(HTTPError):
             await client.ping()
-        await client.close()
+        await client.aclose()
 
 
 @atest
@@ -418,7 +418,7 @@ async def test_health_unreachable():
     client = AsyncHeksherClient('http://notreal.fake.notreal', 1000, ['a', 'b', 'c'])
     with raises(HTTPError):
         await client.ping()
-    await client.close()
+    await client.aclose()
 
 
 @atest
@@ -474,7 +474,7 @@ async def test_switch_main_from_temp(fake_heksher_service, monkeypatch):
         await client.reload()
         assert setting1.get(a='') == 5
         assert setting2.get(b='') == 4
-        await client.close()
+        await client.aclose()
 
 
 @atest
@@ -512,7 +512,7 @@ async def test_switch_main(fake_heksher_service, monkeypatch, caplog):
         assert setting2.get(b='') == 4
         client2 = AsyncHeksherClient(fake_heksher_service.local_url(), 10000000, ['a', 'b'])
         client2.track_contexts(a=['a', 'b'], b=TRACK_ALL)
-        await client1.close()
+        await client1.aclose()
         with assert_logs(caplog, WARNING):  # it should warn you you're doing bad things
             await client2.set_as_main()
     setting3 = Setting('conf3', int, ['b'], 59)
@@ -536,7 +536,7 @@ async def test_switch_main(fake_heksher_service, monkeypatch, caplog):
         assert setting1.get(a='') == 5
         assert setting2.get(b='') == 4
         assert setting3.get(b='') == 3
-        await client2.close()
+        await client2.aclose()
 
 
 @atest
@@ -574,7 +574,7 @@ async def test_switch_main_different_tracking(fake_heksher_service, monkeypatch,
         assert setting2.get(b='') == 4
         client2 = AsyncHeksherClient(fake_heksher_service.local_url(), 10000000, ['a', 'b'])
         client2.track_contexts(a=['a', 'b', 'c'], b="shoobidoobi")
-        await client1.close()
+        await client1.aclose()
         with assert_logs(caplog, WARNING):  # it should warn you you're doing bad things, and that your tracking differs
             await client2.set_as_main()
     setting3 = Setting('conf3', int, ['b'], 59)
@@ -598,7 +598,7 @@ async def test_switch_main_different_tracking(fake_heksher_service, monkeypatch,
         assert setting1.get(a='') == 5
         assert setting2.get(b='') == 4
         assert setting3.get(b='') == 3
-        await client2.close()
+        await client2.aclose()
 
 
 @atest
@@ -636,10 +636,10 @@ async def test_switch_main_different_contexts(fake_heksher_service, monkeypatch)
         assert setting2.get(b='') == 4
     client2 = AsyncHeksherClient(fake_heksher_service.local_url(), 10000000, ['b', 'c'])
     client2.track_contexts(a=['a', 'b'], b=TRACK_ALL)
-    await client1.close()
+    await client1.aclose()
     with raises(RuntimeError):  # not allowed
         await client2.set_as_main()
-    await client2.close()
+    await client2.aclose()
 
 
 @atest
@@ -658,13 +658,13 @@ async def test_switch_main_unclosed(fake_heksher_service, monkeypatch):
     client1 = AsyncHeksherClient(fake_heksher_service.local_url(), 10000000, ['a', 'b'])
     client1.track_contexts(a=['a', 'b'], b=TRACK_ALL)
     await client1.set_as_main()
-    await client1.close()
+    await client1.aclose()
     setting2 = Setting('conf2', int, ['b'], 26)
     client2 = AsyncHeksherClient(fake_heksher_service.local_url(), 10000000, ['a', 'b'])
     client2.track_contexts(a=['a', 'b'], b=TRACK_ALL)
     with raises(RuntimeError):  # not allowed
         await client2.set_as_main()
-    await client2.close()
+    await client2.aclose()
 
 
 @atest
