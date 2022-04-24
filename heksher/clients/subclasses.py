@@ -51,7 +51,6 @@ class V1APIClient(BaseHeksherClient, ABC):
     A client base class with shared logic for heksher's v1 HTTP API.
     """
     _undeclared: Union[asyncio.Queue, queue.Queue]
-    _context_features: OrderedSet[str]
 
     def __init__(self, context_features: Sequence[str]):
         """
@@ -262,7 +261,6 @@ class ContextFeaturesMixin(BaseHeksherClient, ABC):
     """
     A mixin class to handle default context feature values, either from contextvars or string constants.
     """
-    _context_features: Collection[str]
 
     def __init__(self):
         super().__init__()
