@@ -32,6 +32,7 @@ pytest-cov = "*"
 yellowbox = {version="^0.6.0", extras=["webserver"]}
 Sphinx = "^4.3.1"
 sphinx-rtd-theme = "^1.0.0"
+types-Deprecated = "^1.2.6"
 
 [build-system]
 requires = ["poetry>=0.12"]

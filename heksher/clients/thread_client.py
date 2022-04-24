@@ -122,7 +122,7 @@ class ThreadHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin
                 logger.debug('heksher reload not necessary')
                 return
             response.raise_for_status()
-            etag = response.headers['ETag']
+            etag = response.headers.get('ETag', '')
 
             updated_settings = response.json()['settings']
             with self.modification_lock:

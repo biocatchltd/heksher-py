@@ -115,7 +115,7 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
                 logger.debug('heksher reload not necessary')
                 return
             response.raise_for_status()
-            etag = response.headers['ETag']
+            etag = response.headers.get('ETag', '')
 
             updated_settings = response.json()['settings']
             async with self.modification_lock:

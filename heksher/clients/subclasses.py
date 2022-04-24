@@ -11,10 +11,10 @@ from typing import (
 )
 from weakref import WeakValueDictionary
 
+from deprecated import deprecated
 from httpx import Response
 from ordered_set import OrderedSet
 from sortedcontainers import SortedDict, SortedList
-from deprecated import deprecated
 
 import heksher.main_client
 from heksher.heksher_client import BaseHeksherClient, TemporaryClient
