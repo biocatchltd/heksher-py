@@ -1,4 +1,7 @@
 # heksher-py Changelog
+## 0.2.1
+### Fixed
+* fixed a declaration bug where the wrong method was called
 ### 0.2.0
 This version is only compatible with heksher 0.5.0 and above.
 ### Added

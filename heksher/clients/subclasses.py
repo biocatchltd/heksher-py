@@ -121,6 +121,8 @@ class V1APIClient(BaseHeksherClient, ABC):
         elif response.is_error:
             logger.error('error when declaring setting', extra={'setting_name': setting.name,
                                                                 'response_content': response.content})
+            response.raise_for_status()
+
         try:
             response_data = response.json()
         except ValueError:
