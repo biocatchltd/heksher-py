@@ -13,7 +13,7 @@ class FakeHeksher(WebServer):
         self.declare_responses = {}
         self.context_features = []
 
-    @class_http_endpoint('PUT', '/api/v1/settings/declare')
+    @class_http_endpoint('POST', '/api/v1/settings/declare')
     async def declare_settings(self, request: Request):
         data = await request.json()
         setting_name = data['name']

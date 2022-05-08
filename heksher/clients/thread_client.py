@@ -78,9 +78,9 @@ class ThreadHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin
         http_client = self._http_client()
 
         def declare_setting(setting):
-            response = http_client.put('api/v1/settings/declare',
-                                       content=orjson.dumps(setting.to_v1_declaration_body()),
-                                       headers=content_header)
+            response = http_client.post('api/v1/settings/declare',
+                                        content=orjson.dumps(setting.to_v1_declaration_body()),
+                                        headers=content_header)
             self._handle_declaration_response(setting, response)
 
         while self._keep_going:
@@ -102,15 +102,27 @@ class ThreadHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin
         """
 
         http_client = self._http_client()
+        etag = ''
 
         def update():
+            nonlocal etag
+
             logger.debug('heksher reload started')
+
             response = http_client.get('/api/v1/query', params={
                 'settings': ','.join(sorted(self._tracked_settings.keys())),
                 'context_filters': self._context_filters(),
                 'include_metadata': False,
-            }, headers=content_header)
+            }, headers={
+                **content_header,
+                'If-None-Match': etag,
+            })
+
+            if response.status_code == 304:
+                logger.debug('heksher reload not necessary')
+                return
             response.raise_for_status()
+            etag = response.headers.get('ETag', '')
 
             updated_settings = response.json()['settings']
             with self.modification_lock:
@@ -120,10 +132,12 @@ class ThreadHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin
         while self._keep_going:
             try:
                 update()
-            except Exception:
+            except Exception as e:
                 logger.exception('error during heksher update')
+                self.on_update_error(e)
             finally:
                 self._update_event.set()
+                self.on_update_ok()
 
             self._manual_update.clear()
             self._manual_update.wait(self._update_interval)
@@ -197,3 +211,11 @@ class ThreadHeksherClient(V1APIClient, ContextFeaturesMixin, ContextManagerMixin
         response.raise_for_status()
         settings = SettingsOutput.parse_obj(response.json()).to_settings_data()
         return settings
+
+    def on_update_error(self, exc):
+        # override this method to handle update errors
+        pass
+
+    def on_update_ok(self):
+        # override this method to handle update success
+        pass

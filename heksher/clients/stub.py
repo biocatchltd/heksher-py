@@ -113,12 +113,12 @@ class AsyncStubHeksherClient(StubClient, AsyncContextManagerMixin):
     """
     An asynchronous heksher client. Compatible with AsyncHeksherClient.
     """
-    close = None
+    aclose = None
 
     def __init__(self, *args, **kwargs):
         super().__init__()
         self.reload = AsyncMock()
-        self.close = AsyncMock()
+        self.aclose = AsyncMock()
         self.ping = AsyncMock()
 
     async def set_as_main(self):

@@ -70,9 +70,9 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
         """
 
         async def declare_setting(setting):
-            response = await self._http_client.put('api/v1/settings/declare',
-                                                   content=orjson.dumps(setting.to_v1_declaration_body()),
-                                                   headers=content_header)
+            response = await self._http_client.post('api/v1/settings/declare',
+                                                    content=orjson.dumps(setting.to_v1_declaration_body()),
+                                                    headers=content_header)
             self._handle_declaration_response(setting, response)
 
         while True:
@@ -95,17 +95,27 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
         """
         The method for the task that continuously updates declared settings.
         """
+        etag = ''
 
         async def update():
+            nonlocal etag
+
             logger.debug('heksher reload started')
 
             response = await self._http_client.get('/api/v1/query', params={
                 'settings': ','.join(sorted(self._tracked_settings.keys())),
                 'context_filters': self._context_filters(),
                 'include_metadata': False,
-            }, headers=content_header)
+            }, headers={
+                **content_header,
+                'If-None-Match': etag,
+            })
 
+            if response.status_code == 304:
+                logger.debug('heksher reload not necessary')
+                return
             response.raise_for_status()
+            etag = response.headers.get('ETag', '')
 
             updated_settings = response.json()['settings']
             async with self.modification_lock:
@@ -122,8 +132,10 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
                 logger.exception('error during heksher update')
                 if self._update_error is not None:
                     self._update_error.set_exception(e)
+                self.on_update_error(e)
             finally:
                 self._update_event.set()
+                self.on_update_ok()
 
             try:
                 self._manual_update.clear()
@@ -184,7 +196,7 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
             self._update_task = create_task(self._update_loop())
             await self.reload()
         except Exception:
-            await self.close()
+            await self.aclose()
             raise
 
     async def reload(self):
@@ -196,8 +208,8 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
         self._manual_update.set()
         await wait_with_err_sentinel(self._update_event.wait(), self._wait_for_update_error())
 
-    async def close(self):
-        await super().close()
+    async def aclose(self):
+        await super().aclose()
         if self._update_task:
             self._update_task.cancel()
             try:
@@ -240,6 +252,14 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
         response.raise_for_status()
         settings = SettingsOutput.parse_obj(response.json()).to_settings_data()
         return settings
+
+    def on_update_error(self, exc):
+        # override this method to handle update errors
+        pass
+
+    def on_update_ok(self):
+        # override this method to handle update success
+        pass
 
 
 async def wait_with_err_sentinel(coro: Awaitable, err_future: Awaitable[NoReturn]):
