@@ -1,4 +1,7 @@
 # heksher-py Changelog
+## 0.2.2
+### Added
+* support for python 3.10
 ## 0.2.1
 ### Fixed
 * fixed a declaration bug where the wrong method was called
