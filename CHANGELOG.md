@@ -1,8 +1,11 @@
 # heksher-py Changelog
+## 0.2.2
+### Added
+* support for python 3.10
 ## 0.2.1
 ### Fixed
 * fixed a declaration bug where the wrong method was called
-### 0.2.0
+## 0.2.0
 This version is only compatible with heksher 0.5.0 and above.
 ### Added
 * Added support for setting alias in declaration
@@ -30,7 +33,7 @@ This version is only compatible with heksher 0.5.0 and above.
   HeksherMapping, or HeksherSequence instead.
 * using ``patch`` for stub clients is now deprecated. Prefer to set the ``rules`` attribute instead.
 * ``AsyncContextManagerMixin.close`` is now deprecated. Use ``AsyncContextManagerMixin.aclose`` instead.
-### 0.1.5
+## 0.1.5
 ### Added
 * Added add_validator method for Setting; Validators added to each Setting will be called by order they were added 
   (each validator will receive value of previous validator); Validators will be called each time the Setting is updated
