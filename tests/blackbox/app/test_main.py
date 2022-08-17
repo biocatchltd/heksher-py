@@ -1,7 +1,7 @@
 from pytest import mark
 from yellowbox_heksher.heksher_service import HeksherService
 
-from heksher import Setting, AsyncHeksherClient
+from heksher import AsyncHeksherClient, Setting
 from tests.blackbox.app.utils import CreateRuleParams
 
 

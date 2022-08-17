@@ -34,7 +34,7 @@ jobs:
         sh scripts/install.sh
     - name: Tests
       run: |
-        poetry run sh scripts/unittest.sh
+        poetry run sh scripts/coverage.sh
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v1
       with:
