@@ -38,7 +38,7 @@ async def test_declare_before_main(fake_heksher_service, monkeypatch):
         }
     })):
         async with AsyncHeksherClient(fake_heksher_service.local_url(), 10000000, ['a', 'b', 'c']):
-            assert setting.get(b='', c='') == 100
+            assert setting.get(b='0', c='') == 100
 
 
 @atest

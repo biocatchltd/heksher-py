@@ -30,7 +30,7 @@ types-mock = "^0.1.3"
 types-orjson = "^0.1.1"
 pytest-cov = "*"
 yellowbox = {version="^0.6.0", extras=["webserver"]}
-yellowbox-heksher = "^0.1.0"
+yellowbox-heksher = "^0.2.0"
 Sphinx = "^4.3.1"
 sphinx-rtd-theme = "^1.0.0"
 types-Deprecated = "^1.2.6"
