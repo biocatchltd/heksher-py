@@ -2,7 +2,6 @@ import asyncio
 from typing import Sequence
 
 from pytest import fixture
-from yellowbox.clients import docker_client as _docker_client
 from yellowbox_heksher.heksher_service import HeksherService
 
 import heksher.main_client
@@ -10,21 +9,16 @@ from heksher.heksher_client import TemporaryClient
 from tests.blackbox.app.utils import CreateRuleParams
 
 
-@fixture(scope='session')
-def docker_client():
-    with _docker_client() as dc:
-        yield dc
-
-
 @fixture(scope='module')
 def _heksher_service(docker_client):
-    with HeksherService.run(docker_client, heksher_startup_context_features="a;b;c", remove=True) as service:
+    with HeksherService.run(docker_client, heksher_startup_context_features="a;b;c") as service:
         yield service
 
 
 @fixture(scope='function')
 async def heksher_service(_heksher_service: HeksherService):
     yield _heksher_service
+    # input("!!!")
     _heksher_service.clear()
 
 
@@ -43,7 +37,7 @@ def add_rules(heksher_service: HeksherService):
             if resp.is_error:
                 raise Exception(resp.content)
 
-    yield _add_rules
+    return _add_rules
 
 
 @fixture(autouse=True)
