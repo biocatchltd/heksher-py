@@ -162,7 +162,7 @@ class Setting(Generic[T]):
             'type': self.type.heksher_string(),
             'metadata': self.metadata,
             'alias': self.alias,
-            'default_value': self.default_value,
+            'default_value': self.type.convert_to_heksher(x=self.default_value),
             'version': self.version_str,
         }
 

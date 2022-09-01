@@ -1,10 +1,12 @@
 from asyncio import sleep
+from enum import IntFlag, auto
 from logging import WARNING
 
+from orjson import orjson
 from pytest import mark
 from yellowbox_heksher.heksher_service import HeksherService
 
-from heksher import AsyncHeksherClient, Setting
+from heksher import TRACK_ALL, AsyncHeksherClient, Setting
 from tests.blackbox.app.utils import CreateRuleParams
 from tests.unittest.util import assert_logs
 
@@ -17,14 +19,9 @@ async def test_health_check(heksher_service):
 
 @mark.asyncio
 async def test_init_works(heksher_service: HeksherService):
-    resp = heksher_service.http_client.post('/api/v1/context_features', json={'context_feature': 'razi'})
-    resp.raise_for_status()
-
-    res = heksher_service.http_client.get('/api/v1/context_features')
-    res.raise_for_status()
-
-    client = AsyncHeksherClient(heksher_service.local_url, 10000000, ['a', 'b', 'c'])
-    await client.aclose()
+    heksher_service.http_client.post('/api/v1/context_features', json={'context_feature': 'context'})
+    async with AsyncHeksherClient(heksher_service.local_url, 10000000, ['a', 'b', 'c']):
+        pass
 
 
 @mark.asyncio
@@ -33,11 +30,9 @@ async def test_get_setting_names(heksher_service: HeksherService):
         Setting("test_config", type=int, configurable_features=['a', 'b', 'c'], default_value=1,
                 metadata={"description": "test"})
     )
-    heksher = AsyncHeksherClient(heksher_service.local_url, update_interval=60, context_features=['a', 'b', 'c'])
-    await heksher.set_as_main()  # we only want to declare settings
-    await heksher.aclose()
-
-    assert heksher_service.get_setting_names() == ["test_config"]
+    async with AsyncHeksherClient(heksher_service.local_url, update_interval=60,
+                                  context_features=['a', 'b', 'c']) as client:
+        assert heksher_service.get_setting_names() == ["test_config"]
 
 
 @mark.asyncio
@@ -45,42 +40,39 @@ async def test_declare_before_main(heksher_service, monkeypatch, add_rules):
     setting = Setting('cache_size', type=int, configurable_features=['b', 'c'], default_value=50)
 
     client = AsyncHeksherClient(heksher_service.local_url, 10000000, ['a', 'b', 'c'])
-    await client.set_as_main()
     client.track_contexts(b='0')
 
-    await add_rules([CreateRuleParams(setting='cache_size', feature_values={'b': '0'}, value=100)])
-    await client.reload()
-    assert setting.get(b='0', c='') == 100
-    await client.aclose()
+    async with client:
+        add_rules([CreateRuleParams(setting='cache_size', feature_values={'b': '0'}, value=100)])
+        await client.reload()
+        assert setting.get(b='0', c='') == 100
 
 
 @mark.asyncio
-async def test_declare_after_main(heksher_service, monkeypatch, add_rules):
+async def test_declare_after_main(heksher_service, add_rules):
     client = AsyncHeksherClient(heksher_service.local_url, 10000000, ['a', 'b', 'c'])
-    await client.set_as_main()
-    setting = Setting('cache_size', type=int, configurable_features=['b', 'c'], default_value=50)
-    assert not client._undeclared.empty()
-    await client._undeclared.join()
-    assert setting.get(b='', c='') == 50
     client.track_contexts(b='5')
-    await add_rules([CreateRuleParams(setting='cache_size', feature_values={'b': '5'}, value=100)])
-    await client.reload()
-    assert setting.get(b='5', c='') == 100
-    await client.aclose()
+
+    async with client:
+        setting = Setting('cache_size', type=int, configurable_features=['b', 'c'], default_value=50)
+        assert not client._undeclared.empty()
+        await client._undeclared.join()
+        assert setting.get(b='', c='') == 50
+        add_rules([CreateRuleParams(setting='cache_size', feature_values={'b': '5'}, value=100)])
+        await client.reload()
+        assert setting.get(b='5', c='') == 100
 
 
 @mark.asyncio
-async def test_regular_update(heksher_service, monkeypatch, add_rules):
+async def test_regular_update(heksher_service, add_rules):
     setting = Setting('cache_size', type=int, configurable_features=['b', 'c'], default_value=50)
-
     client = AsyncHeksherClient(heksher_service.local_url, 0.02, ['a', 'b', 'c'])
-    await client.set_as_main()
     client.track_contexts(b='0')
 
-    await add_rules([CreateRuleParams(setting='cache_size', feature_values={'b': '0'}, value=100)])
-    await sleep(1)
-    assert setting.get(b='0', c='') == 100
-    await client.aclose()
+    async with client:
+        add_rules([CreateRuleParams(setting='cache_size', feature_values={'b': '0'}, value=100)])
+        await sleep(0.1)
+        assert setting.get(b='0', c='') == 100
 
 
 @mark.asyncio
@@ -91,8 +83,7 @@ async def test_regular_update(heksher_service, monkeypatch, add_rules):
     ['a', 'b', 'c', 'd'],
     ['e', 'f', 'g']
 ])
-async def test_cf_mismatch(heksher_service, caplog, monkeypatch, expected):
-    print(f"!!!!{expected=}")
+async def test_cf_mismatch(heksher_service, caplog, expected):
     with assert_logs(caplog, WARNING):
         async with AsyncHeksherClient(heksher_service.local_url, 1000, expected) as client:
             assert client._context_features == expected
@@ -102,13 +93,77 @@ async def test_cf_mismatch(heksher_service, caplog, monkeypatch, expected):
 async def test_redundant_defaults(heksher_service, add_rules, caplog):
     setting = Setting('cache_size', type=int, configurable_features=['b', 'c'], default_value=50)
     client = AsyncHeksherClient(heksher_service.local_url, 10000000, ['a', 'b', 'c'])
-    await client.set_as_main()
-
     client.track_contexts(b='B')
-    await add_rules([CreateRuleParams(setting='cache_size', feature_values={'b': 'B'}, value=100)])
-    await client.reload()
 
-    with assert_logs(caplog, WARNING):
-        client.set_defaults(b='B', d='im redundant')
-        assert setting.get(c='') == 100
-    await client.aclose()
+    async with client:
+        add_rules([CreateRuleParams(setting='cache_size', feature_values={'b': 'B'}, value=100)])
+        await client.reload()
+
+        with assert_logs(caplog, WARNING):
+            client.set_defaults(b='B', d='im redundant')
+            assert setting.get(c='') == 100
+
+
+@mark.asyncio
+async def test_trackcontexts(heksher_service, add_rules):
+    setting = Setting('cache_size', int, ['b', 'c'], 50)
+    client = AsyncHeksherClient(heksher_service.local_url, 10000000, ['a', 'b', 'c'])
+    client.track_contexts(b='B', a=TRACK_ALL)
+
+    async with client:
+        add_rules([CreateRuleParams(setting='cache_size', feature_values={'b': 'B'}, value=100)])
+        await client.reload()
+        assert setting.get(b='B', c='') == 100
+
+
+@mark.asyncio
+async def test_outdated_declaration(heksher_service, caplog):
+    heksher_service.http_client.post('api/v1/settings/declare', content=orjson.dumps(
+        {'name': 'cache_size',
+         'type': 'int',
+         'configurable_features': ['a', 'b', 'c'],
+         'default_value': 70,
+         'version': '1.0'}
+    )).raise_for_status()
+    heksher_service.http_client.post('api/v1/settings/declare', content=orjson.dumps(
+        {'name': 'cache_size',
+         'type': 'int',
+         'configurable_features': ['a', 'b', 'c'],
+         'default_value': 60,
+         'version': '2.0'}
+    )).raise_for_status()
+
+    async with AsyncHeksherClient(heksher_service.local_url, 10000000, ['a', 'b', 'c']) as client:
+        with assert_logs(caplog, WARNING):
+            setting = Setting('cache_size', type=int, configurable_features=['a', 'b'], default_value=80, version='1.0')
+            await client._undeclared.join()
+            assert setting.get(a='', b='') == 60
+
+
+@mark.asyncio
+async def test_upgraded_declaration(heksher_service, caplog):
+    setting = Setting('cache_size', type=int, configurable_features=['a', 'b', 'c'], default_value=50,
+                      version='1.0')
+
+    async with AsyncHeksherClient(heksher_service.local_url, 10000000, ['a', 'b', 'c']) as client:
+        setting = Setting('cache_size', type=int, configurable_features=['a', 'b'], default_value=80, version='2.0')
+        await client._undeclared.join()
+        assert setting.get(b='') == 80
+
+
+@mark.asyncio
+async def test_flags_setting(heksher_service, add_rules):
+    class Color(IntFlag):
+        blue = auto()
+        red = auto()
+        green = auto()
+
+    setting = Setting('c', Color, ['a', 'b', 'c'], default_value=Color(0))
+
+    client = AsyncHeksherClient(heksher_service.local_url, 10000000, ['a', 'b', 'c'])
+    client.track_contexts(c='blue')
+
+    async with client:
+        add_rules([CreateRuleParams(setting='c', feature_values={'c': 'blue'}, value=['blue', 'green'])])
+        await client.reload()
+        assert setting.get(a='', b='', c='blue') == Color.green | Color.blue

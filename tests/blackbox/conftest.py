@@ -1,5 +1,5 @@
 import asyncio
-from typing import Sequence
+from typing import Iterable
 
 from pytest import fixture
 from yellowbox_heksher.heksher_service import HeksherService
@@ -18,7 +18,6 @@ def _heksher_service(docker_client):
 @fixture(scope='function')
 async def heksher_service(_heksher_service: HeksherService):
     yield _heksher_service
-    # input("!!!")
     _heksher_service.clear()
 
 
@@ -31,7 +30,7 @@ def event_loop(request):
 
 @fixture(scope="function")
 def add_rules(heksher_service: HeksherService):
-    async def _add_rules(rules: Sequence[CreateRuleParams]):
+    def _add_rules(rules: Iterable[CreateRuleParams]):
         for rule in rules:
             resp = (heksher_service.http_client.post('/api/v1/rules', content=rule.json()))
             if resp.is_error:

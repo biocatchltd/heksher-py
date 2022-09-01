@@ -22,7 +22,6 @@ except ImportError:
     def get_args(tp: Any) -> Tuple[Any, ...]:
         return getattr(tp, '__args__', ())
 
-
     def get_origin(tp: Any) -> Optional[Any]:
         return getattr(tp, '__origin__', None)
 
@@ -131,8 +130,7 @@ class HeksherFlags(SettingType[F]):
         return Conversion(ret, coercions)
 
     def convert_to_heksher(self, x: F) -> Any:
-        members = [(x & self.type_(i)).name for i in self.type_]
-        return [x for x in members if x]
+        return [flag.name for flag in self.type_ if x & flag]
 
 
 E = TypeVar('E', bound=Enum)
@@ -192,11 +190,10 @@ class HeksherSequence(SettingType[Sequence[T]]):
             else:
                 values.append(conversion.value)
                 coercions.extend(f'element {i}: {c}' for c in conversion.coercions)
-        ret = Conversion(tuple(values), coercions)
-        return ret
+        return Conversion(tuple(values), coercions)
 
-    def convert_to_heksher(self, x: T) -> Any:
-        return [self.inner.convert_to_heksher(v) for i, v in enumerate(x)]
+    def convert_to_heksher(self, x: Sequence[T]) -> Any:
+        return [self.inner.convert_to_heksher(v) for v in x]
 
 
 class HeksherMapping(SettingType[Mapping[str, T]]):
