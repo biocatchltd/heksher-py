@@ -65,7 +65,11 @@ class SettingType(ABC, Generic[T]):
     @abstractmethod
     def convert_to_heksher(self, x: T) -> Any:
         """
+        Args:
+            x: immutable pythonic value
 
+        Returns:
+            x, JSON-parsed value
         """
         pass
 

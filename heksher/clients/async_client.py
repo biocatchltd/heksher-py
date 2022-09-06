@@ -250,8 +250,7 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
         """
         List all the settings in the service
         """
-        response = await self._http_client.get('/api/v1/settings', params=orjson.dumps(
-            {'include_additional_data': True}))
+        response = await self._http_client.get('/api/v1/settings', params={'include_additional_data': 'True'})
         response.raise_for_status()
         settings = SettingsOutput.parse_obj(response.json()).to_settings_data()
         return settings

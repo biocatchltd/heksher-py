@@ -11,7 +11,7 @@ from tests.blackbox.app.utils import CreateRuleParams
 
 @fixture(scope='module')
 def _heksher_service(docker_client):
-    with HeksherService.run(docker_client, heksher_startup_context_features="a;b;c") as service:
+    with HeksherService.run(docker_client, heksher_startup_context_features="a;b;c;z") as service:
         yield service
 
 

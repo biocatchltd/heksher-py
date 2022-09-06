@@ -359,7 +359,7 @@ async def test_flags_setting_reject_default(fake_heksher_service, monkeypatch, c
         'settings': {
             'c': {
                 'rules': [{'context_features': [['a', 'f']], 'value': ['green', 'blue'], 'rule_id': 1}],
-                'default_value': [['blank']]
+                'default_value': ['blank']
             }
         }
     })):
