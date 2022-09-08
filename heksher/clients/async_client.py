@@ -70,7 +70,7 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
         """
 
         async def declare_setting(setting):
-            response = await self._http_client.post('api/v1/settings/declare',
+            response = await self._http_client.post('/api/v1/settings/declare',
                                                     content=orjson.dumps(setting.to_v1_declaration_body()),
                                                     headers=content_header)
             self._handle_declaration_response(setting, response)

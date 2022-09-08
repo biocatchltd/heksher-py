@@ -1,4 +1,7 @@
 # heksher-py Changelog
+## Next
+### Fixed
+* bug in setting declaration
 ## 0.2.2
 ### Added
 * support for python 3.10
