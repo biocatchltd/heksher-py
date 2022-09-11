@@ -70,7 +70,7 @@ def test_multi_switch(caplog):
     c2 = SyncStubHeksherClient()
     c2.set_defaults(a='', b='', c='')
     c2.set_as_main()
-    with assert_logs(caplog, WARNING):
+    with assert_logs(caplog, WARNING, r'.+ multiple clients'):
         c2.patch(a, [
             Rule({'x': '0'}, 0),
             Rule({'x': '1'}, 1)

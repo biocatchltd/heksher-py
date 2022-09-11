@@ -1,4 +1,8 @@
 # heksher-py Changelog
+## Next
+### Changed
+* in get_settings(), changed the params from orjson.dumps to an actual dictionary
+* convert() in setting_type.py split into convert_from heksher() and convert_to_heksher()
 ## 0.2.2
 ### Added
 * support for python 3.10

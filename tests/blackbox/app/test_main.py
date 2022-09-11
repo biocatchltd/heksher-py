@@ -86,7 +86,7 @@ async def test_regular_update(heksher_service, add_rules):
     ['e', 'f', 'g']
 ])
 async def test_cf_mismatch(heksher_service, caplog, expected):
-    with assert_logs(caplog, WARNING):
+    with assert_logs(caplog, WARNING, 'context feature mismatch'):
         async with AsyncHeksherClient(heksher_service.local_url, 1000, expected) as client:
             assert client._context_features == expected
 
@@ -101,7 +101,7 @@ async def test_redundant_defaults(heksher_service, add_rules, caplog):
         add_rules([CreateRuleParams(setting='cache_size', feature_values={'b': 'B'}, value=100)])
         await client.reload()
 
-        with assert_logs(caplog, WARNING):
+        with assert_logs(caplog, WARNING, r'.+ not specified .+'):
             client.set_defaults(b='B', d='im redundant')
             assert setting.get(c='') == 100
 
@@ -136,7 +136,7 @@ async def test_outdated_declaration(heksher_service, caplog):
     )).raise_for_status()
 
     async with AsyncHeksherClient(heksher_service.local_url, 10000000, ['a', 'b', 'c']) as client:
-        with assert_logs(caplog, WARNING):
+        with assert_logs(caplog, WARNING, r'.+ outdated .+'):
             setting = Setting('cache_size', type=int, configurable_features=['a', 'b'], default_value=80, version='1.0')
             await client._undeclared.join()
             assert setting.get(a='', b='') == 60
@@ -200,12 +200,35 @@ async def test_flags_setting_coerce(heksher_service, add_rules, caplog):
     client.track_contexts(a=TRACK_ALL, b=TRACK_ALL, c=TRACK_ALL)
     caplog.clear()
 
-    with assert_logs(caplog, WARNING):
+    with assert_logs(caplog, WARNING, r'.+ coerced .+'):
         async with client:
             add_rules([CreateRuleParams(setting='c', feature_values={'c': 'x'}, value=['green', 'blue', 'white'])])
             await client.reload()
             assert setting.get(a='', b='', c='') == Color.blue
             assert setting.get(a='', b='', c='x') == Color.green | Color.blue
+
+
+@mark.asyncio
+async def test_flags_setting_coerce_default(heksher_service, monkeypatch, caplog):
+    heksher_service.http_client.post('api/v1/settings/declare', content=orjson.dumps(
+        {'name': 'c',
+         'configurable_features': ['a', 'b', 'c'],
+         'type': 'Flags["blue", "green", "white"]',
+         'default_value': ['white', 'blue'],
+         'version': '1.0'}
+    )).raise_for_status()
+
+    class Color(IntFlag):
+        blue = auto()
+        red = auto()
+        green = auto()
+
+    c = Setting('c', Color, 'abc', default_value=Color(0))
+
+    caplog.clear()
+    with assert_logs(caplog, WARNING, r'^conflict .+'), assert_logs(caplog, WARNING, r'.+ default value coerced .+'):
+        async with AsyncHeksherClient(heksher_service.local_url, 1000, ['a', 'b', 'c']):
+            assert c.get(a='re', b='', c='') == Color.blue
 
 
 @mark.asyncio
@@ -225,9 +248,9 @@ async def test_flags_setting_reject_default(heksher_service, add_rules, caplog):
 
     c = Setting('c', Color, 'abc', default_value=Color(0))
     client = AsyncHeksherClient(heksher_service.local_url, 1000, ['a', 'b', 'c'])
-    client.track_contexts(a='f')
+    client.track_contexts(a=TRACK_ALL, b=TRACK_ALL, c=TRACK_ALL)
     caplog.clear()
-    with assert_logs(caplog, WARNING):
+    with assert_logs(caplog, WARNING, r'^conflict .+'), assert_logs(caplog, WARNING, r'.+ coerced .+'):
         async with client:
             add_rules([CreateRuleParams(setting='c', feature_values={'a': 'f'}, value=['green', 'blue'])])
             await client.reload()
@@ -253,7 +276,7 @@ async def test_flags_setting_reject_context(heksher_service, add_rules, caplog):
     client = AsyncHeksherClient(heksher_service.local_url, 1000, ['a', 'b', 'c'])
     client.track_contexts(a='x', b=TRACK_ALL, c=TRACK_ALL)
     caplog.clear()
-    with assert_logs(caplog, WARNING):
+    with assert_logs(caplog, WARNING, r'^conflict .+'):
         async with client:
             add_rules([CreateRuleParams(setting='c', feature_values={'a': 'x', 'z': 'foo'}, value=['green', 'red'])])
             add_rules([CreateRuleParams(setting='c', feature_values={'a': 'x'}, value=['green', 'blue'])])
@@ -297,7 +320,7 @@ async def test_switch_main(heksher_service, add_rules, caplog):
     setting1 = Setting('conf1', int, ['a'], 74)
     setting2 = Setting('conf2', int, ['b'], 26)
     client1 = AsyncHeksherClient(heksher_service.local_url, 10000000, ['a', 'b'])
-    client1.track_contexts(a=['x', 'y'], b=TRACK_ALL)
+    client1.track_contexts(a=['x', 'y', 'z'], b=TRACK_ALL)
     async with client1:
         add_rules([
             CreateRuleParams(setting='conf1', feature_values={'a': 'x'}, value=5),
@@ -309,18 +332,18 @@ async def test_switch_main(heksher_service, add_rules, caplog):
         assert setting2.get(b='y') == 4
 
     client2 = AsyncHeksherClient(heksher_service.local_url, 10000000, ['a', 'b'])
-    client2.track_contexts(a=['w', 'z'], b=TRACK_ALL)
-    with assert_logs(caplog, WARNING):  # it should warn you you're doing bad things
+    client2.track_contexts(a=['x', 'y', 'z'], b=TRACK_ALL)
+    with assert_logs(caplog, WARNING, r'.+ NOT recommended! .+'):  # it should warn you you're doing bad things
         await client2.set_as_main()
     setting3 = Setting('conf3', int, ['b'], 59)
     await client2._undeclared.join()
     add_rules([
-        CreateRuleParams(setting='conf1', feature_values={'a': 'w'}, value=6),
+        CreateRuleParams(setting='conf1', feature_values={'a': 'z'}, value=6),
         CreateRuleParams(setting='conf2', feature_values={'b': 's'}, value=7),
         CreateRuleParams(setting='conf3', feature_values={'b': 'z'}, value=10)
     ])
     await client2.reload()
-    assert setting1.get(a='w') == 6
+    assert setting1.get(a='z') == 6
     assert setting2.get(b='s') == 7
     assert setting3.get(b='z') == 10
     await client2.aclose()
@@ -344,7 +367,8 @@ async def test_switch_main_different_tracking(heksher_service, add_rules, caplog
 
     client2 = AsyncHeksherClient(heksher_service.local_url, 10000000, ['a', 'b'])
     client2.track_contexts(a=['x', 'y', 'z'], b="shoobidoobi")
-    with assert_logs(caplog, WARNING):  # it should warn you you're doing bad things, and that your tracking differs
+    with assert_logs(caplog, WARNING, r'.+ tracks different context .+'):
+        # it should warn you you're doing bad things, and that your tracking differs
         await client2.set_as_main()
 
     setting3 = Setting('conf3', int, ['b'], 59)

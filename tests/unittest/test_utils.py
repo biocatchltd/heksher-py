@@ -79,7 +79,7 @@ def test_collate_conflict(caplog):
             }
         }
     }
-    with assert_logs(caplog, ERROR):
+    with assert_logs(caplog, ERROR, r'^rule conflict.+'):
         assert collate_rules('abc', [
             ([], 0),
             ([('a', 'A0')], 1),
@@ -90,7 +90,7 @@ def test_collate_conflict(caplog):
 
 
 def test_collate_conflict_nill(caplog):
-    with assert_logs(caplog, ERROR):
+    with assert_logs(caplog, ERROR, r'^rule conflict.+'):
         assert collate_rules('', [
             ([], 0),
             ([], 1)
