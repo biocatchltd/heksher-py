@@ -9,7 +9,7 @@ def assert_logs(caplog, level, pattern: Union[Pattern[str], str]):
     caplog.clear()
     with caplog.at_level(level):
         yield
-        assert any([pattern.fullmatch(record.msg) for record in caplog.records])
+        assert any(pattern.fullmatch(record.msg) for record in caplog.records)
 
 
 @contextmanager
