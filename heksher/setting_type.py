@@ -49,7 +49,7 @@ class SettingType(ABC, Generic[T]):
         pass
 
     @abstractmethod
-    def convert(self, x) -> Conversion[T]:
+    def convert_from_heksher(self, x) -> Conversion[T]:
         """
         Args:
             x: JSON-parsed value, retrieved from http api
@@ -59,6 +59,17 @@ class SettingType(ABC, Generic[T]):
 
         Notes:
             convert must return an immutable value
+        """
+        pass
+
+    @abstractmethod
+    def convert_to_heksher(self, x: T) -> Any:
+        """
+        Args:
+            x: immutable pythonic value
+
+        Returns:
+            x, JSON-parsed value
         """
         pass
 
@@ -78,10 +89,13 @@ class SimpleSettingType(SettingType[T]):
     def heksher_string(self) -> str:
         return self.name
 
-    def convert(self, x):
+    def convert_from_heksher(self, x):
         if not isinstance(x, self.type):
             raise TypeError(f'value is not of type {self.type}')
         return Conversion(x)
+
+    def convert_to_heksher(self, x: T) -> Any:
+        return x
 
 
 F = TypeVar('F', bound=IntFlag)
@@ -105,7 +119,7 @@ class HeksherFlags(SettingType[F]):
     def heksher_string(self) -> str:
         return 'Flags[' + ','.join(sorted(str(orjson.dumps(x), 'utf-8') for x in self.type_.__members__)) + ']'
 
-    def convert(self, x) -> Conversion[F]:
+    def convert_from_heksher(self, x) -> Conversion[F]:
         ret = self.type_(0)
         coercions = []
         for i in x:
@@ -118,6 +132,9 @@ class HeksherFlags(SettingType[F]):
             else:
                 ret |= member
         return Conversion(ret, coercions)
+
+    def convert_to_heksher(self, x: F) -> Any:
+        return [flag.name for flag in self.type_ if x & flag]
 
 
 E = TypeVar('E', bound=Enum)
@@ -141,11 +158,14 @@ class HeksherEnum(SettingType[E]):
     def heksher_string(self) -> str:
         return 'Enum[' + ','.join(sorted(str(orjson.dumps(x.value), 'utf-8') for x in self.type_)) + ']'
 
-    def convert(self, x) -> Conversion[E]:
+    def convert_from_heksher(self, x) -> Conversion[E]:
         try:
             return Conversion(self.type_(x))
         except ValueError as ve:
             raise TypeError('value is not a valid enum member') from ve
+
+    def convert_to_heksher(self, x: E) -> Any:
+        return x.value
 
 
 class HeksherSequence(SettingType[Sequence[T]]):
@@ -163,18 +183,21 @@ class HeksherSequence(SettingType[Sequence[T]]):
     def heksher_string(self) -> str:
         return f'Sequence<{self.inner.heksher_string()}>'
 
-    def convert(self, x) -> Conversion[Sequence[T]]:
+    def convert_from_heksher(self, x) -> Conversion[Sequence[T]]:
         values = []
         coercions = []
         for i, v in enumerate(x):
             try:
-                conversion = self.inner.convert(v)
+                conversion = self.inner.convert_from_heksher(v)
             except TypeError as e:
                 coercions.append(f'failed to convert element {i}: {e!r}')
             else:
                 values.append(conversion.value)
                 coercions.extend(f'element {i}: {c}' for c in conversion.coercions)
         return Conversion(tuple(values), coercions)
+
+    def convert_to_heksher(self, x: Sequence[T]) -> Any:
+        return [self.inner.convert_to_heksher(v) for v in x]
 
 
 class HeksherMapping(SettingType[Mapping[str, T]]):
@@ -192,18 +215,21 @@ class HeksherMapping(SettingType[Mapping[str, T]]):
     def heksher_string(self) -> str:
         return f'Mapping<{self.inner.heksher_string()}>'
 
-    def convert(self, x) -> Conversion[Mapping[str, T]]:
+    def convert_from_heksher(self, x) -> Conversion[Mapping[str, T]]:
         values = {}
         coercions = []
         for k, v in x.items():
             try:
-                conversion = self.inner.convert(v)
+                conversion = self.inner.convert_from_heksher(v)
             except TypeError as e:
                 coercions.append(f'failed to convert value for key {k}: {e!r}')
             else:
                 values[k] = conversion.value
                 coercions.extend(f'{k}: {c}' for c in conversion.coercions)
         return Conversion(MappingProxyType(values), coercions)
+
+    def convert_to_heksher(self, x: Mapping[str, T]) -> Any:
+        return {k: self.inner.convert_to_heksher(v) for k, v in x.items()}
 
 
 _simples: Mapping[type, SettingType] = {

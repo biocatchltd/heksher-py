@@ -9,7 +9,7 @@ from logging import getLogger
 from typing import Any, Awaitable, Dict, NoReturn, Optional, Sequence, TypeVar, Union
 
 import orjson
-from httpx import AsyncClient, HTTPError
+from httpx import AsyncClient, HTTPError, HTTPStatusError
 
 from heksher.clients.subclasses import AsyncContextManagerMixin, ContextFeaturesMixin, V1APIClient
 from heksher.clients.util import SettingsOutput
@@ -129,7 +129,10 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
                 # in 3.7, cancelled is a normal exception
                 raise
             except Exception as e:
-                logger.exception('error during heksher update')
+                log_extras = {}
+                if isinstance(e, HTTPStatusError):
+                    log_extras['response_content'] = e.response.content
+                logger.exception('error during heksher update', extra=log_extras)
                 if self._update_error is not None:
                     self._update_error.set_exception(e)
                 self.on_update_error(e)
@@ -247,8 +250,7 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
         """
         List all the settings in the service
         """
-        response = await self._http_client.get('/api/v1/settings', params=orjson.dumps(
-            {'include_additional_data': True}))
+        response = await self._http_client.get('/api/v1/settings', params={'include_additional_data': 'True'})
         response.raise_for_status()
         settings = SettingsOutput.parse_obj(response.json()).to_settings_data()
         return settings

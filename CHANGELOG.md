@@ -1,4 +1,8 @@
 # heksher-py Changelog
+## Next
+### Fixed
+* in `get_settings`: getting settings with metadata works
+* creating a flags setting now works
 ## 0.2.2
 ### Added
 * support for python 3.10

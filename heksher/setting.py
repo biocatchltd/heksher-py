@@ -80,7 +80,7 @@ class Setting(Generic[T]):
         heksher.main_client.Main.add_settings((self,))
 
     def convert_server_value(self, raw_value: Any, rule: Optional[QueriedRule]) -> Conversion[T]:
-        convert = self.type.convert(raw_value)
+        convert = self.type.convert_from_heksher(raw_value)
         if convert.coercions:
             value = self.on_coerce(convert.value, raw_value, convert.coercions, rule, self)
         else:
@@ -162,7 +162,7 @@ class Setting(Generic[T]):
             'type': self.type.heksher_string(),
             'metadata': self.metadata,
             'alias': self.alias,
-            'default_value': self.default_value,
+            'default_value': self.type.convert_to_heksher(self.default_value),
             'version': self.version_str,
         }
 

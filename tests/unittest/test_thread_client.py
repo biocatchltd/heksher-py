@@ -83,7 +83,7 @@ def test_regular_update(fake_heksher_service, monkeypatch):
 def test_heksher_unreachable(caplog):
     setting = Setting('cache_size', int, ['b', 'c'], 50)
 
-    with assert_logs(caplog, ERROR):
+    with assert_logs(caplog, ERROR, r'.+ failed'):
         with ThreadHeksherClient('http://notreal.fake.notreal', 10000, ['a', 'b', 'c']):
             pass
     assert setting.get(b='', c='') == 50
@@ -125,7 +125,7 @@ def test_trackcontexts(fake_heksher_service, monkeypatch):
 def test_cf_mismatch(fake_heksher_service, caplog, monkeypatch, expected):
     monkeypatch.setattr(fake_heksher_service, 'context_features', ['a', 'b', 'c'])
 
-    with assert_logs(caplog, WARNING):
+    with assert_logs(caplog, WARNING, r'context feature mismatch'):
         with ThreadHeksherClient(fake_heksher_service.local_url(), 1000, expected) as client:
             assert client._context_features == expected
 
@@ -144,7 +144,7 @@ def test_redundant_defaults(fake_heksher_service, caplog, monkeypatch):
             }
         }
     })):
-        with assert_logs(caplog, WARNING):
+        with assert_logs(caplog, WARNING, r'.+ not specified .+'):
             with ThreadHeksherClient(fake_heksher_service.local_url(), 1000, ['a', 'b', 'c']) as client:
                 client.set_defaults(b='B', d='im redundant')
                 assert setting.get(c='') == 100
@@ -257,7 +257,7 @@ def test_switch_main(fake_heksher_service, monkeypatch, caplog):
         client2 = ThreadHeksherClient(fake_heksher_service.local_url(), 10000000, ['a', 'b'])
         client2.track_contexts(a=['a', 'b'], b=TRACK_ALL)
         client1.close()
-        with assert_logs(caplog, WARNING):  # it should warn you you're doing bad things
+        with assert_logs(caplog, WARNING, r'.+ NOT recommended! .+'):  # it should warn you you're doing bad things
             client2.set_as_main()
     setting3 = Setting('conf3', int, ['b'], 59)
     with fake_heksher_service.query_rules.patch(JSONResponse({
@@ -318,7 +318,8 @@ def test_switch_main_different_tracking(fake_heksher_service, monkeypatch, caplo
         client2 = ThreadHeksherClient(fake_heksher_service.local_url(), 10000000, ['a', 'b'])
         client2.track_contexts(a=['a', 'b', 'c'], b="shoobidoobi")
         client1.close()
-        with assert_logs(caplog, WARNING):  # it should warn you you're doing bad things, and that your tracking differs
+        with assert_logs(caplog, WARNING, r'.+ tracks different context .+'):
+            # it should warn you you're doing bad things, and that your tracking differs
             client2.set_as_main()
     setting3 = Setting('conf3', int, ['b'], 59)
     with fake_heksher_service.query_rules.patch(JSONResponse({
