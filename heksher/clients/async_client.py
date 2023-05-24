@@ -194,7 +194,8 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
         try:
             self._declaration_task = create_task(self._declaration_loop())
             undeclared_task = create_task(self._undeclared.join())
-            await wait_with_err_sentinel(undeclared_task, self._wait_for_declaration_error())
+            wait_for_update_error_task = create_task(self._wait_for_update_error())
+            await wait_with_err_sentinel(undeclared_task, wait_for_update_error_task)
             # important to only start the update thread once all pending settings are declared, otherwise we may have
             # stale settings
             self._update_task = create_task(self._update_loop())
@@ -211,7 +212,8 @@ class AsyncHeksherClient(V1APIClient, ContextFeaturesMixin, AsyncContextManagerM
         self._update_event.clear()
         self._manual_update.set()
         update_event_task = create_task(self._update_event.wait())
-        await wait_with_err_sentinel(update_event_task, self._wait_for_update_error())
+        wait_for_update_error_task = create_task(self._wait_for_update_error())
+        await wait_with_err_sentinel(update_event_task, wait_for_update_error_task)
 
     async def aclose(self):
         await super().aclose()
